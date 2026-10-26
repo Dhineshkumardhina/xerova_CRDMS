@@ -1,0 +1,54 @@
+[
+  {
+    "id": "CR-008810",
+    "name": "Vikram Sethi",
+    "alias": "Vicky",
+    "father_name": "Ramesh Sethi",
+    "age": 29,
+    "gender": "Male",
+    "phone": "+1 555-019-7711",
+    "identification_number": "XXXX-XXXX-8810",
+    "primary_address": "45 Park Avenue, Block C",
+    "city": "Metro City",
+    "state": "NY",
+    "status": "Active",
+    "category": "Fraud",
+    "cases": [
+      {
+        "case_number": "FIR-2024-9912",
+        "title": "Corporate Wire Fraud and Identity Theft",
+        "date_filed": "2024-06-10",
+        "status": "Under Investigation"
+      }
+    ]
+  },
+  {
+    "id": "CR-008811",
+    "name": "Ananya Patel",
+    "alias": "Ana",
+    "father_name": "Kiran Patel",
+    "age": 31,
+    "gender": "Female",
+    "phone": "+1 555-019-3344",
+    "identification_number": "XXXX-XXXX-8811",
+    "primary_address": "88 Harbor Line, Sector 4",
+    "city": "Metro Central",
+    "state": "NY",
+    "status": "Active",
+    "category": "Cybercrime"
+  },
+  {
+    "id": "CR-001245",
+    "name": "Raj Kumar Sharma",
+    "father_name": "Suresh Kumar Sharma",
+    "phone": "+1 555-019-2831",
+    "identification_number": "XXXX-XXXX-9900",
+    "category": "Theft"
+  },
+  {
+    "id": "CR-009999",
+    "name": "",
+    "father_name": "Unknown",
+    "age": 150
+  }
+]

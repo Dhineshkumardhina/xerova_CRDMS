@@ -1,0 +1,22 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.diagnosticMode": "openFilesOnly",
+  "python.analysis.ignore": [
+    "**/__pyrefly_virtual__/**",
+    "**/inmemory/**",
+    "**/.git/**"
+  ],
+  "files.watcherExclude": {
+    "**/__pyrefly_virtual__/**": true,
+    "**/inmemory/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true
+  }
+}

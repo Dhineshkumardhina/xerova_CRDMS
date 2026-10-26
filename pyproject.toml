@@ -1,0 +1,9 @@
+[tool.pyright]
+include = ["backend", "scripts"]
+exclude = ["**/__pyrefly_virtual__/**", "**/inmemory/**", "**/.git/**"]
+extraPaths = ["backend"]
+
+[tool.mypy]
+mypy_path = "backend"
+ignore_missing_imports = true
+exclude = ["__pyrefly_virtual__", "inmemory"]

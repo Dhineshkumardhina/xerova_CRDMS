@@ -1,0 +1,29 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python / SQLite / Caches
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Storage & Output
+storage/mugshots/*
+storage/documents/*
+storage/media/*
+!storage/.gitkeep
+
+# Environments
+.venv/
+venv/
+

@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-08-23T19:55:36.786466",
+  "dry_run": false,
+  "total_source_records": 4,
+  "successful_records": 0,
+  "duplicate_records": 3,
+  "invalid_records": 1,
+  "failed_image_processing": 0,
+  "details": {
+    "duplicates": [
+      {
+        "name": "Vikram Sethi",
+        "existing_id": "CR-008810",
+        "reason": "Matched Existing Criminal ID 'CR-008810'"
+      },
+      {
+        "name": "Ananya Patel",
+        "existing_id": "CR-008811",
+        "reason": "Matched Existing Criminal ID 'CR-008811'"
+      },
+      {
+        "name": "Raj Kumar Sharma",
+        "existing_id": "CR-001245",
+        "reason": "Matched Existing Criminal ID 'CR-001245'"
+      }
+    ],
+    "invalid": [
+      {
+        "record": {
+          "id": "CR-009999",
+          "name": "",
+          "father_name": "Unknown",
+          "age": 150
+        },
+        "reasons": [
+          "Missing or invalid name (minimum 2 characters required)",
+          "Age out of bounds (1-120): 150"
+        ]
+      }
+    ],
+    "failed_images": [],
+    "imported_ids": []
+  },
+  "execution_time_seconds": 0.12
+}

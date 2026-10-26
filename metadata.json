@@ -1,0 +1,6 @@
+{
+  "name": "Justice Ledger - Crime Record Management System",
+  "description": "Comprehensive Crime Record Management System (CRMS) featuring criminal profiling, facial recognition photo search, dossier management, case tracking, and investigative analytics.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
