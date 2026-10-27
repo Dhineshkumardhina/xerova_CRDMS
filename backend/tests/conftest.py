@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from app.main import app
 from app.db.session import get_db, Base
 from app.core.security import get_password_hash, create_access_token
+from app.db.migrations import seed_rbac_data
 from app.models.user import UserModel
 from app.models.role_permission import RoleModel, PermissionModel
 from app.models.criminal import CriminalProfileModel
@@ -37,35 +38,8 @@ def setup_test_database():
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
 
-    # Seed Permissions
-    perm_codes = [
-        ("criminal:create", "Create Criminal Dossiers"),
-        ("criminal:read", "View Criminal Dossiers"),
-        ("criminal:update", "Update Criminal Dossiers"),
-        ("criminal:archive", "Archive Criminal Dossiers"),
-        ("case:create", "Create Cases"),
-        ("case:read", "View Cases"),
-        ("case:update", "Update Cases"),
-        ("photo_search:use", "Use Facial Recognition Search"),
-        ("reports:read", "View Operational Reports"),
-        ("users:manage", "Manage System Users"),
-        ("audit_logs:read", "View Security Audit Logs"),
-    ]
-    perm_objs = []
-    for code, name in perm_codes:
-        p = PermissionModel(id=f"perm-{code}", code=code, name=name)
-        db.add(p)
-        perm_objs.append(p)
-
-    # Seed Roles
-    admin_role = RoleModel(id="role-admin", name="Administrator", description="Full Access")
-    admin_role.permissions = perm_objs
-    db.add(admin_role)
-
-    officer_role = RoleModel(id="role-officer", name="Officer", description="Operational Officer Access")
-    officer_permissions = [p for p in perm_objs if p.code in {"criminal:read", "case:read", "photo_search:use", "reports:read"}]
-    officer_role.permissions = officer_permissions
-    db.add(officer_role)
+    # Seed all 19 permissions, 7 roles, and police stations
+    seed_rbac_data(db)
 
     # Seed Users
     admin_user = UserModel(
@@ -83,6 +57,24 @@ def setup_test_database():
     )
     db.add(admin_user)
 
+    # Seed Police Station stn-01
+    station = db.query(PoliceStationModel).filter(
+        (PoliceStationModel.id == "stn-01") | (PoliceStationModel.station_code == "PS-PUDU-01")
+    ).first()
+    if not station:
+        station = PoliceStationModel(
+            id="stn-01",
+            name="Puducherry Central Station",
+            station_code="PS-PUDU-01",
+            district="Puducherry",
+            state="Puducherry",
+            region="Southern Region",
+            phone_number="+91 413-222-1000"
+        )
+        db.add(station)
+        db.flush()
+    stn_id = station.id
+
     officer_user = UserModel(
         id="usr-officer-01",
         username="7710-SO",
@@ -94,20 +86,13 @@ def setup_test_database():
         clearance_level="Level 2 - Confidential",
         is_superuser=False,
         is_active=True,
-        role_id="role-officer"
-    )
-    db.add(officer_user)
-
-    # Seed Police Station
-    station = PoliceStationModel(
-        id="stn-01",
-        name="Puducherry Central Station",
-        station_code="PS-PUDU-01",
+        role_id="role-officer",
+        police_station_id=stn_id,
         district="Puducherry",
         state="Puducherry",
-        phone_number="+91 413-222-1000"
+        region="Southern Region"
     )
-    db.add(station)
+    db.add(officer_user)
 
     # Seed Sample Criminal Profile
     criminal = CriminalProfileModel(
@@ -122,7 +107,9 @@ def setup_test_database():
         identification_number="XXXX-XXXX-9900",
         primary_address="12 MG Road",
         city="Puducherry",
+        district="Puducherry",
         state="Puducherry",
+        police_station_id=stn_id,
         category="Theft",
         status="Active",
         is_archived=False,

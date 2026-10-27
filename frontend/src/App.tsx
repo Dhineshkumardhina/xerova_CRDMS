@@ -17,6 +17,7 @@ import {
   CURRENT_OFFICER,
 } from './constants/mockData';
 import { api } from './api';
+import { clearTokens } from './api/client';
 
 // Component Imports
 import { LoginScreen } from './components/LoginScreen';
@@ -30,6 +31,7 @@ import { CategoriesView } from './components/CategoriesView';
 import { CasesListView } from './components/CasesListView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
+import { AdminManagementView } from './components/AdminManagementView';
 import { SupportLexiconView } from './components/SupportLexiconView';
 import { OfflineScreen } from './components/OfflineScreen';
 import { PhotoSearchModal } from './components/PhotoSearchModal';
@@ -42,9 +44,7 @@ const STORAGE_KEY = 'crms_criminal_profiles_v2';
 export default function App() {
   // Authentication State
   const isLoginPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().endsWith('/login');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return Boolean(localStorage.getItem('crms_access_token'));
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [showLoginScreen, setShowLoginScreen] = useState<boolean>(isLoginPath);
   const [officer, setOfficer] = useState<Officer>(CURRENT_OFFICER);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
@@ -72,11 +72,18 @@ export default function App() {
   const [activities, setActivities] = useState<ActivityItem[]>(INITIAL_ACTIVITY);
   const [selectedProfile, setSelectedProfile] = useState<CriminalProfile | null>(() => profiles[0] || null);
 
-  // Dynamic category calculations based on actual profiles
-  const categories = CATEGORY_STATS.map((cat) => ({
-    ...cat,
-    recordsCount: profiles.filter((p) => p.category === cat.category).length,
-  }));
+  const [backendCategories, setBackendCategories] = useState<any[]>([]);
+
+  // Dynamic category calculations based on actual backend data + loaded profiles
+  const categories = CATEGORY_STATS.map((cat) => {
+    const backendCat = backendCategories.find((bc: any) => bc.category === cat.category || bc.name === cat.category);
+    const backendCount = backendCat?.recordsCount;
+    const localCount = profiles.filter((p) => p.category === cat.category).length;
+    return {
+      ...cat,
+      recordsCount: backendCount !== undefined && backendCount > localCount ? backendCount : localCount,
+    };
+  });
 
   // Modals State
   const [isPhotoSearchOpen, setIsPhotoSearchOpen] = useState<boolean>(false);
@@ -97,13 +104,8 @@ export default function App() {
           setIsAuthenticated(true);
         })
         .catch(() => {
-          // If offline or demo session, retain authenticated demo state
-          if (token.startsWith('demo-') || !navigator.onLine) {
-            setOfficer(CURRENT_OFFICER);
-            setIsAuthenticated(true);
-          } else {
-            setIsAuthenticated(false);
-          }
+          clearTokens();
+          setIsAuthenticated(false);
         })
         .finally(() => {
           setIsCheckingAuth(false);
@@ -155,6 +157,11 @@ export default function App() {
       api.getAuditLogs().then((logs) => {
         if (logs && logs.length > 0) {
           setActivities(logs);
+        }
+      });
+      api.getCategories().then((cats) => {
+        if (cats && cats.length > 0) {
+          setBackendCategories(cats);
         }
       });
     }
@@ -240,60 +247,69 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSaveProfile = (saved: CriminalProfile) => {
-    api.saveProfile(saved);
-    setProfiles((prev) => {
-      const exists = prev.some((p) => p.id === saved.id);
-      if (exists) {
-        return prev.map((p) => (p.id === saved.id ? saved : p));
-      } else {
-        return [saved, ...prev];
-      }
-    });
-
-    // Add activity log
-    const newActivity: ActivityItem = {
-      id: `act-${Date.now()}`,
-      subjectName: saved.name,
-      subjectId: saved.id,
-      action: editingProfile ? 'Status Updated' : 'Warrant Issued',
-      time: 'Just now',
-      mugshotUrl: saved.mugshotUrl,
-      profileId: saved.id,
-    };
-    setActivities((prev) => [newActivity, ...prev]);
-
-    setSelectedProfile(saved);
-    setCurrentTab('profile');
-  };
-
-  const handleArchiveToggle = (profileId: string) => {
-    api.toggleArchive(profileId);
-    setProfiles((prev) =>
-      prev.map((p) => {
-        if (p.id === profileId) {
-          const updated = { ...p, isArchived: !p.isArchived };
-          if (selectedProfile?.id === profileId) {
-            setSelectedProfile(updated);
-          }
-          return updated;
+  const handleSaveProfile = async (saved: CriminalProfile) => {
+    try {
+      const serverProfile = await api.saveProfile(saved);
+      const finalProfile = serverProfile || saved;
+      setProfiles((prev) => {
+        const exists = prev.some((p) => p.id === finalProfile.id);
+        if (exists) {
+          return prev.map((p) => (p.id === finalProfile.id ? finalProfile : p));
+        } else {
+          return [finalProfile, ...prev];
         }
-        return p;
-      })
-    );
+      });
+
+      // Add activity log
+      const newActivity: ActivityItem = {
+        id: `act-${Date.now()}`,
+        subjectName: finalProfile.name,
+        subjectId: finalProfile.id,
+        action: editingProfile ? 'Status Updated' : 'Warrant Issued',
+        time: 'Just now',
+        mugshotUrl: finalProfile.mugshotUrl,
+        profileId: finalProfile.id,
+      };
+      setActivities((prev) => [newActivity, ...prev]);
+
+      setSelectedProfile(finalProfile);
+      setCurrentTab('profile');
+    } catch (err: any) {
+      console.error('Failed to save profile:', err);
+      alert(err.message || 'Failed to save criminal record to backend');
+    }
   };
 
-  const handleUploadMedia = (profileId: string, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = e.target?.result as string;
+  const handleArchiveToggle = async (profileId: string) => {
+    try {
+      const isArchived = await api.toggleArchive(profileId);
+      setProfiles((prev) =>
+        prev.map((p) => {
+          if (p.id === profileId) {
+            const updated = { ...p, isArchived };
+            if (selectedProfile?.id === profileId) {
+              setSelectedProfile(updated);
+            }
+            return updated;
+          }
+          return p;
+        })
+      );
+    } catch (err: any) {
+      console.error('Failed to toggle archive status:', err);
+    }
+  };
+
+  const handleUploadMedia = async (profileId: string, file: File) => {
+    try {
+      const uploaded = await api.uploadCriminalPhoto(profileId, file, false);
       const newMedia: MediaItem = {
-        id: `m-${Date.now()}`,
-        url,
-        title: file.name,
+        id: uploaded?.id || `m-${Date.now()}`,
+        url: uploaded?.file_url || URL.createObjectURL(file),
+        title: uploaded?.caption || file.name,
         type: 'photo',
         dateUploaded: 'Today',
-        filename: file.name,
+        filename: uploaded?.file_name || file.name,
       };
 
       setProfiles((prev) =>
@@ -308,32 +324,41 @@ export default function App() {
           return p;
         })
       );
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Failed to upload media:', err);
+      alert(err.message || 'Media upload failed');
+    }
   };
 
-  const handleUploadDoc = (profileId: string, title: string) => {
-    const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}`,
-      title,
-      type: 'pdf',
-      dateUploaded: 'Today',
-      filename: title.endsWith('.pdf') ? title : `${title}.pdf`,
-      size: '1.2 MB',
-    };
+  const handleUploadDoc = async (profileId: string, file: File) => {
+    try {
+      const docRes = await api.uploadDocument(file, file.name, 'Evidence Document', profileId);
+      const newDoc: DocumentItem = {
+        id: docRes?.id || `doc-${Date.now()}`,
+        title: docRes?.title || file.name,
+        type: (docRes?.file_extension?.replace('.', '') || 'pdf') as any,
+        dateUploaded: 'Today',
+        filename: docRes?.original_filename || file.name,
+        size: `${((docRes?.file_size || file.size) / (1024 * 1024)).toFixed(1)} MB`,
+        isConfidential: docRes?.is_confidential,
+      };
 
-    setProfiles((prev) =>
-      prev.map((p) => {
-        if (p.id === profileId) {
-          const updated = { ...p, documents: [...p.documents, newDoc] };
-          if (selectedProfile?.id === profileId) {
-            setSelectedProfile(updated);
+      setProfiles((prev) =>
+        prev.map((p) => {
+          if (p.id === profileId) {
+            const updated = { ...p, documents: [...p.documents, newDoc] };
+            if (selectedProfile?.id === profileId) {
+              setSelectedProfile(updated);
+            }
+            return updated;
           }
-          return updated;
-        }
-        return p;
-      })
-    );
+          return p;
+        })
+      );
+    } catch (err: any) {
+      console.error('Failed to upload document:', err);
+      alert(err.message || 'Document upload failed');
+    }
   };
 
   const handleBulkUpdateCaseStatus = (caseIds: string[], newStatus: CaseStatus) => {
@@ -422,6 +447,10 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
         onOpenNewRecord={() => {
+          if (!officer?.canCreateCriminals) {
+            alert('Access Denied: You do not have permission to create criminal records. Only Super Administrators can grant this authorization.');
+            return;
+          }
           setEditingProfile(null);
           setIsNewRecordOpen(true);
         }}
@@ -537,10 +566,23 @@ export default function App() {
               onOpenCaseModal={(cs) => setActiveCaseModal(cs)}
               onSelectProfile={handleSelectProfile}
               onBulkUpdateStatus={handleBulkUpdateCaseStatus}
+              onCaseCreated={(newCase) => {
+                if (newCase.profile && newCase.profile.id !== 'UNASSIGNED') {
+                  setProfiles((prev) =>
+                    prev.map((p) =>
+                      p.id === newCase.profile.id
+                        ? { ...p, cases: [newCase, ...p.cases] }
+                        : p
+                    )
+                  );
+                }
+              }}
             />
           )}
 
           {currentTab === 'reports' && <ReportsView allProfiles={profiles} />}
+
+          {currentTab === 'admin' && <AdminManagementView currentOfficer={officer} />}
 
           {currentTab === 'settings' && (
             <SettingsView

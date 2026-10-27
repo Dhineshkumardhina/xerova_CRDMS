@@ -11,37 +11,6 @@ interface DataPoint {
   cleared: number;
 }
 
-const WEEKLY_DATA: Record<'7d' | '8w' | '30d', DataPoint[]> = {
-  '7d': [
-    { label: 'Mon', fullDate: 'Aug 16', records: 28, warrants: 6, cleared: 19 },
-    { label: 'Tue', fullDate: 'Aug 17', records: 35, warrants: 9, cleared: 22 },
-    { label: 'Wed', fullDate: 'Aug 18', records: 31, warrants: 5, cleared: 26 },
-    { label: 'Thu', fullDate: 'Aug 19', records: 46, warrants: 12, cleared: 30 },
-    { label: 'Fri', fullDate: 'Aug 20', records: 52, warrants: 14, cleared: 34 },
-    { label: 'Sat', fullDate: 'Aug 21', records: 39, warrants: 8, cleared: 28 },
-    { label: 'Sun', fullDate: 'Aug 22', records: 44, warrants: 11, cleared: 31 },
-  ],
-  '8w': [
-    { label: 'Wk 1', fullDate: 'Jun 28 - Jul 04', records: 128, warrants: 32, cleared: 94 },
-    { label: 'Wk 2', fullDate: 'Jul 05 - Jul 11', records: 142, warrants: 38, cleared: 108 },
-    { label: 'Wk 3', fullDate: 'Jul 12 - Jul 18', records: 135, warrants: 29, cleared: 115 },
-    { label: 'Wk 4', fullDate: 'Jul 19 - Jul 25', records: 168, warrants: 45, cleared: 130 },
-    { label: 'Wk 5', fullDate: 'Jul 26 - Aug 01', records: 154, warrants: 41, cleared: 122 },
-    { label: 'Wk 6', fullDate: 'Aug 02 - Aug 08', records: 189, warrants: 52, cleared: 146 },
-    { label: 'Wk 7', fullDate: 'Aug 09 - Aug 15', records: 172, warrants: 44, cleared: 139 },
-    { label: 'Wk 8', fullDate: 'Aug 16 - Aug 22', records: 205, warrants: 56, cleared: 164 },
-  ],
-  '30d': [
-    { label: 'Day 1', fullDate: 'Jul 24', records: 22, warrants: 5, cleared: 18 },
-    { label: 'Day 5', fullDate: 'Jul 28', records: 31, warrants: 8, cleared: 24 },
-    { label: 'Day 10', fullDate: 'Aug 02', records: 45, warrants: 12, cleared: 32 },
-    { label: 'Day 15', fullDate: 'Aug 07', records: 38, warrants: 9, cleared: 29 },
-    { label: 'Day 20', fullDate: 'Aug 12', records: 49, warrants: 14, cleared: 38 },
-    { label: 'Day 25', fullDate: 'Aug 17', records: 54, warrants: 15, cleared: 41 },
-    { label: 'Day 30', fullDate: 'Aug 22', records: 61, warrants: 18, cleared: 48 },
-  ],
-};
-
 interface WeeklyTrendChartProps {
   allProfiles?: CriminalProfile[];
 }
@@ -53,10 +22,50 @@ export const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ allProfiles 
   const [hoveredPoint, setHoveredPoint] = useState<DataPoint | null>(null);
   const [dimensions, setDimensions] = useState({ width: 600, height: 200 });
 
-  const data = WEEKLY_DATA[timeframe];
+  // Generate dynamic trend points from actual profiles
+  const data = React.useMemo<DataPoint[]>(() => {
+    const points: DataPoint[] = [];
+    const count = timeframe === '7d' ? 7 : timeframe === '8w' ? 8 : 30;
+
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date();
+      if (timeframe === '8w') {
+        d.setDate(d.getDate() - i * 7);
+        const label = `Wk ${8 - i}`;
+        const fullDate = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        points.push({ label, fullDate, records: 0, warrants: 0, cleared: 0 });
+      } else {
+        d.setDate(d.getDate() - i);
+        const label =
+          timeframe === '7d'
+            ? d.toLocaleDateString(undefined, { weekday: 'short' })
+            : `Day ${30 - i}`;
+        const fullDate = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+        const dateStr = d.toISOString().slice(0, 10);
+        const matched = allProfiles.filter(
+          (p) => p.createdAt && p.createdAt.startsWith(dateStr)
+        );
+        const warrants = matched.filter((p) => p.status === 'Warrant Issued').length;
+        const cleared = matched.filter(
+          (p) => p.status === 'Closed' || p.status === 'Adjudicated'
+        ).length;
+
+        points.push({
+          label,
+          fullDate,
+          records: matched.length,
+          warrants,
+          cleared,
+        });
+      }
+    }
+    return points;
+  }, [timeframe, allProfiles]);
+
   const totalInPeriod = data.reduce((acc, curr) => acc + curr.records, 0);
-  const avgInPeriod = Math.round(totalInPeriod / data.length);
-  const peakVal = Math.max(...data.map((d) => d.records));
+  const avgInPeriod = data.length > 0 ? Math.round(totalInPeriod / data.length) : 0;
+  const peakVal = data.length > 0 ? Math.max(...data.map((d) => d.records)) : 0;
 
   // Resize observer to ensure responsive width
   useEffect(() => {
@@ -125,7 +134,7 @@ export const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ allProfiles 
       .range([0, innerWidth])
       .padding(0.1);
 
-    const maxVal: number = d3.max(data, (d: DataPoint) => d.records) ?? 60;
+    const maxVal: number = Math.max(d3.max(data, (d: DataPoint) => d.records) ?? 0, 5);
     const minVal = 0;
     const yScale = d3
       .scaleLinear()

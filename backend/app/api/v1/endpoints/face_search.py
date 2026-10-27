@@ -111,9 +111,19 @@ async def face_search(
             },
         )
 
-    # ── Step 2: Perform End-to-End Biometric Search ───────────────────────────
+    # ── Step 2: Validate threshold bounds ────────────────────────────────────
     applied_threshold = threshold if threshold is not None else settings.FACE_MATCH_THRESHOLD
+    if applied_threshold is not None:
+        try:
+            val = float(applied_threshold)
+            if val > 2.0:
+                # Convert legacy percentage to Euclidean tolerance
+                val = 0.60
+            applied_threshold = max(config.MIN_TOLERANCE, min(config.MAX_TOLERANCE, val))
+        except (ValueError, TypeError):
+            applied_threshold = config.DEFAULT_TOLERANCE
 
+    # ── Step 3: Perform End-to-End Biometric Search ───────────────────────────
     try:
         search_result = face_recognition_service.search_database(
             photo_input=image_input,

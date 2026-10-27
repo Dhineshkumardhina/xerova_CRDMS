@@ -53,6 +53,8 @@ def get_documents(
         ) for d in docs
     ]
 
+from app.core.rbac import can_access_case, can_access_criminal
+
 @router.post("/upload", response_model=DocumentResponseSchema)
 async def upload_document(
     file: UploadFile = File(...),
@@ -64,6 +66,34 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_permission("criminal:update"))
 ):
+    # Verify criminal jurisdiction if attaching to criminal profile
+    if criminal_id:
+        target_crim = db.query(CriminalProfileModel).filter(
+            CriminalProfileModel.id == criminal_id,
+            CriminalProfileModel.is_deleted == False
+        ).first()
+        if not target_crim:
+            raise HTTPException(status_code=404, detail="Target criminal dossier not found")
+        if not can_access_criminal(current_user, target_crim, db):
+            raise HTTPException(
+                status_code=403,
+                detail="Access Denied: Target criminal dossier is outside your regional jurisdiction."
+            )
+
+    # Verify case jurisdiction if attaching to case dossier
+    if case_id:
+        target_case = db.query(CaseRecordModel).filter(
+            CaseRecordModel.id == case_id,
+            CaseRecordModel.is_deleted == False
+        ).first()
+        if not target_case:
+            raise HTTPException(status_code=404, detail="Target case dossier not found")
+        if not can_access_case(current_user, target_case):
+            raise HTTPException(
+                status_code=403,
+                detail="Access Denied: Target case dossier is outside your regional jurisdiction."
+            )
+
     file_bytes = await file.read()
     upload_info = storage_service.validate_and_save_document(
         file_bytes=file_bytes,
@@ -88,23 +118,29 @@ async def upload_document(
         uploaded_by_id=current_user.id,
         date_uploaded="Today"
     )
-    db.add(doc)
 
-    if criminal_id:
-        c_link = CriminalDocumentModel(criminal_id=criminal_id, document_id=doc.id)
-        db.add(c_link)
+    try:
+        db.add(doc)
 
-    if case_id:
-        case_link = CaseDocumentModel(case_id=case_id, document_id=doc.id)
-        db.add(case_link)
+        if criminal_id:
+            c_link = CriminalDocumentModel(criminal_id=criminal_id, document_id=doc.id)
+            db.add(c_link)
 
-    db.commit()
-    db.refresh(doc)
+        if case_id:
+            case_link = CaseDocumentModel(case_id=case_id, document_id=doc.id)
+            db.add(case_link)
+
+        db.commit()
+        db.refresh(doc)
+    except Exception as e:
+        db.rollback()
+        storage_service.delete_document(upload_info["storage_key"])
+        raise HTTPException(status_code=500, detail=f"Failed to persist document metadata: {str(e)}")
 
     # Audit Log Entry
     log_audit_event(
         db=db,
-        action="Document Upload",
+        action="Evidence Uploaded",
         resource_type="Document",
         resource_id=doc.id,
         subject_name=doc.title,
@@ -143,9 +179,55 @@ def download_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document record not found")
 
-    full_path = os.path.join(settings.STORAGE_DIR, doc.storage_key) if doc.storage_key else None
-    if not full_path or not os.path.exists(full_path):
-        raise HTTPException(status_code=404, detail="Physical document object missing from storage")
+    # Jurisdictional Authorization Check across linked cases
+    for case_link in doc.case_links:
+        if case_link.case and not can_access_case(current_user, case_link.case):
+            log_audit_event(
+                db=db,
+                action="DOCUMENT_DOWNLOAD_DENIED",
+                resource_type="Document",
+                resource_id=doc.id,
+                subject_name=doc.title,
+                result="FAILED",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access Denied: You do not have jurisdictional clearance to download documents associated with this case."
+            )
+
+    # Jurisdictional Authorization Check across linked criminals
+    for crim_link in doc.criminal_links:
+        if crim_link.criminal and not can_access_criminal(current_user, crim_link.criminal, db):
+            log_audit_event(
+                db=db,
+                action="DOCUMENT_DOWNLOAD_DENIED",
+                resource_type="Document",
+                resource_id=doc.id,
+                subject_name=doc.title,
+                result="FAILED",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access Denied: You do not have jurisdictional clearance to download documents associated with this criminal dossier."
+            )
+
+    # Path traversal protection
+    if not doc.storage_key or ".." in doc.storage_key:
+        raise HTTPException(status_code=400, detail="Invalid storage path identifier.")
+
+    base_storage = os.path.abspath(settings.STORAGE_DIR)
+    full_path = os.path.abspath(os.path.join(base_storage, doc.storage_key))
+    if not full_path.startswith(base_storage):
+        raise HTTPException(status_code=400, detail="Path traversal attempt blocked.")
+
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Physical document object missing from storage.")
 
     log_audit_event(
         db=db,
@@ -156,13 +238,15 @@ def download_document(
         result="SUCCESS",
         user_id=current_user.id,
         officer_name=current_user.full_name,
-        request=request
+        request=request,
+        details={"sha256": doc.file_hash_sha256, "filename": doc.filename}
     )
 
     return FileResponse(
         path=full_path,
         filename=doc.filename,
-        media_type="application/octet-stream"
+        media_type="application/octet-stream",
+        headers={"X-Content-SHA256": doc.file_hash_sha256 or ""}
     )
 
 @router.delete("/{document_id}")
@@ -175,6 +259,15 @@ def delete_document(
     doc = db.query(DocumentItemModel).filter(DocumentItemModel.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document record not found")
+
+    # Verify authorization before deletion
+    for case_link in doc.case_links:
+        if case_link.case and not can_access_case(current_user, case_link.case):
+            raise HTTPException(status_code=403, detail="Access Denied: Case is outside your regional jurisdiction.")
+
+    for crim_link in doc.criminal_links:
+        if crim_link.criminal and not can_access_criminal(current_user, crim_link.criminal, db):
+            raise HTTPException(status_code=403, detail="Access Denied: Criminal record is outside your regional jurisdiction.")
 
     if doc.storage_key:
         storage_service.delete_document(doc.storage_key)
@@ -191,6 +284,11 @@ def delete_document(
         request=request
     )
 
-    db.delete(doc)
-    db.commit()
+    try:
+        db.delete(doc)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
     return {"status": "success", "message": "Document deleted from storage and database"}

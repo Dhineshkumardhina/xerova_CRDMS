@@ -101,12 +101,45 @@ class FaceDetector:
         else:
             rgb_image = image_bgr
 
-        # Face Detection via face_recognition
-        face_locations = face_recognition.face_locations(
-            rgb_image,
-            number_of_times_to_upsample=config.DETECTION_UPSAMPLE,
-            model=config.DETECTION_MODEL
-        )
+        orig_h, orig_w = rgb_image.shape[:2]
+        max_edge = max(orig_h, orig_w)
+
+        # Adaptive Downscaling: For large images, scale down for HOG detection and map bboxes back
+        if max_edge > config.MAX_DETECTION_DIMENSION:
+            scale = config.MAX_DETECTION_DIMENSION / float(max_edge)
+            scaled_w = int(round(orig_w * scale))
+            scaled_h = int(round(orig_h * scale))
+            detection_rgb = cv2.resize(rgb_image, (scaled_w, scaled_h), interpolation=cv2.INTER_AREA)
+            
+            face_locations_scaled = face_recognition.face_locations(
+                detection_rgb,
+                number_of_times_to_upsample=config.DETECTION_UPSAMPLE,
+                model=config.DETECTION_MODEL
+            )
+
+            if face_locations_scaled:
+                face_locations = [
+                    (
+                        max(0, min(orig_h, int(round(t / scale)))),
+                        max(0, min(orig_w, int(round(r / scale)))),
+                        max(0, min(orig_h, int(round(b / scale)))),
+                        max(0, min(orig_w, int(round(l / scale))))
+                    )
+                    for (t, r, b, l) in face_locations_scaled
+                ]
+            else:
+                # Fallback to original image if downscale did not detect a face
+                face_locations = face_recognition.face_locations(
+                    rgb_image,
+                    number_of_times_to_upsample=config.DETECTION_UPSAMPLE,
+                    model=config.DETECTION_MODEL
+                )
+        else:
+            face_locations = face_recognition.face_locations(
+                rgb_image,
+                number_of_times_to_upsample=config.DETECTION_UPSAMPLE,
+                model=config.DETECTION_MODEL
+            )
 
         if not face_locations:
             return []

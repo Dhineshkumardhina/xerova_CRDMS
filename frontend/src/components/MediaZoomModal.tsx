@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MediaItem, DocumentItem } from '../types';
-import { X, Download, ZoomIn, FileText } from 'lucide-react';
+import { X, Download, ZoomIn, FileText, Loader2 } from 'lucide-react';
+import { api } from '../api';
 
 interface MediaZoomModalProps {
   media: MediaItem | null;
@@ -9,7 +10,29 @@ interface MediaZoomModalProps {
 }
 
 export const MediaZoomModal: React.FC<MediaZoomModalProps> = ({ media, document, onClose }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!media && !document) return null;
+
+  const handleDownload = async () => {
+    if (document) {
+      try {
+        setIsDownloading(true);
+        await api.downloadDocument(document.id, document.filename);
+      } catch (err: any) {
+        alert(err.message || 'Download failed: You may not have authorization for this document.');
+      } finally {
+        setIsDownloading(false);
+      }
+    } else if (media) {
+      const a = window.document.createElement('a');
+      a.href = media.url;
+      a.download = media.filename || 'media.jpg';
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/70 backdrop-blur-xs select-none animate-backdrop-enter">
@@ -52,7 +75,7 @@ export const MediaZoomModal: React.FC<MediaZoomModalProps> = ({ media, document,
                 </p>
               </div>
               <div className="p-3.5 bg-neutral-50 rounded-lg border border-[#E5E7EB] text-[12px] text-neutral-700 text-left">
-                <strong className="text-neutral-900 font-semibold">Certified DOJ Document</strong>
+                <strong className="text-neutral-900 font-semibold">Certified Law Enforcement Document</strong>
                 <p className="text-[11px] text-neutral-500 mt-0.5">
                   Digitally signed and hashed under federal chain of custody protocols.
                 </p>
@@ -64,11 +87,16 @@ export const MediaZoomModal: React.FC<MediaZoomModalProps> = ({ media, document,
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-[#E5E7EB] bg-[#F8F9FA] flex justify-between items-center">
           <button
-            onClick={() => alert(`Downloading verified copy of ${media?.filename || document?.filename}...`)}
-            className="text-[12px] font-semibold text-neutral-700 flex items-center gap-1.5 hover:text-neutral-900 hover:underline cursor-pointer"
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="text-[12px] font-semibold text-neutral-700 flex items-center gap-1.5 hover:text-neutral-900 hover:underline cursor-pointer disabled:opacity-50"
           >
-            <Download className="w-4 h-4" />
-            <span>Download High-Res Original</span>
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>{isDownloading ? 'Downloading...' : 'Download High-Res Original'}</span>
           </button>
           <button
             onClick={onClose}

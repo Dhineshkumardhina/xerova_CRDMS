@@ -77,9 +77,10 @@ class SocialMediaDetailSchema(BaseModel):
 class CriminalProfileSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: Optional[str] = None
     name: str
     alias: Optional[str] = None
+
     fatherName: Optional[str] = ""
     dob: Optional[str] = "1990-01-01"
     age: Optional[int] = 30

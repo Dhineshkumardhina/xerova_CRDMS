@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Xerova CRDMS</string>
+    <string name="title_activity_main">Xerova CRDMS</string>
+    <string name="package_name">com.xerova.crdms</string>
+    <string name="custom_url_scheme">com.xerova.crdms</string>
+</resources>

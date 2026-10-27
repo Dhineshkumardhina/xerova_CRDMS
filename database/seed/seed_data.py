@@ -99,8 +99,8 @@ def seed_database():
             if not link:
                 db.add(RolePermissionModel(role_id=admin_role.id, permission_id=p_obj.id))
 
-        # Assign operational permissions to Officer
-        officer_perms = ["criminal:read", "criminal:create", "criminal:update", "case:read", "case:create", "case:update", "photo_search:use", "reports:read"]
+        # Assign operational permissions to Officer (criminal record creation is disabled by default)
+        officer_perms = ["criminal:read", "criminal:update", "case:read", "case:create", "case:update", "photo_search:use", "reports:read"]
         for p_code in officer_perms:
             p_obj = perm_map[p_code]
             link = db.query(RolePermissionModel).filter(
@@ -204,105 +204,9 @@ def seed_database():
             cat_map[cdata["name"]] = cat_obj
         print("Crime categories seeded.")
 
-        # 7. Seed Sample Criminal Record (Raj Kumar Sharma)
-        raj = db.query(CriminalProfileModel).filter(CriminalProfileModel.identification_number == "XXXX-XXXX-9900").first()
-        if not raj:
-            raj = CriminalProfileModel(
-                id="CR-001245",
-                name="Raj Kumar Sharma",
-                normalized_name="raj kumar sharma",
-                alias="The Wraith",
-                father_name="Suresh Kumar Sharma",
-                age=34,
-                gender="Male",
-                phone_number="+1 555-019-2831",
-                identification_number="XXXX-XXXX-9900",
-                raw_id_number="9900-1122-3344",
-                primary_address="Sector 15, Block B, Metro City",
-                city="Metro City",
-                state="NY",
-                height="178 cm",
-                weight="75 kg",
-                eye_color="Brown",
-                hair_color="Black",
-                mugshot_url="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256",
-                mugshot_date="2024-05-12",
-                risk_level="High Risk",
-                status="Warrant Issued",
-                category="Theft",
-                is_historical=False,
-                is_archived=False,
-                is_deleted=False
-            )
-            db.add(raj)
-            db.flush()
-
-            # Photo Model
-            photo_obj = CriminalPhotoModel(
-                id=str(uuid.uuid4()),
-                criminal_id=raj.id,
-                photo_url=raj.mugshot_url,
-                filename="raj_sharma_intake.jpg",
-                content_type="image/jpeg",
-                is_primary_mugshot=True
-            )
-            db.add(photo_obj)
-            db.flush()
-
-            # Seed 128-dim Face Embedding for Raj
-            # Generate deterministic feature vector
-            import numpy as np
-            np.random.seed(1245)
-            dummy_vec = (np.random.randn(128)).astype(float)
-            dummy_vec = (dummy_vec / np.linalg.norm(dummy_vec)).tolist()
-
-            emb_obj = FaceEmbeddingModel(
-                id=str(uuid.uuid4()),
-                criminal_id=raj.id,
-                photo_id=photo_obj.id,
-                embedding_vector={"vector": dummy_vec, "dim": 128},
-                feature_metadata={"model_version": "DOJ-NeuralMesh-v4.2"}
-            )
-            db.add(emb_obj)
-
-            # Mark
-            mark = IdentificationMarkModel(
-                id=str(uuid.uuid4()),
-                criminal_id=raj.id,
-                type="scar",
-                description="2-inch vertical scar on right eyebrow",
-                body_location="Face / Eyebrow"
-            )
-            db.add(mark)
-
-            # Case
-            c1 = CaseRecordModel(
-                id="c-101",
-                case_number="FIR-2024-8891",
-                title="Grand Theft Larceny at Metro Jewelry Exchange",
-                description="Armed robbery involving forced entry and theft of precious metals valued at $450,000.",
-                date_filed="2024-05-12",
-                status="Warrant Issued",
-                category="Theft",
-                police_station_id=station.id,
-                lead_officer_id=admin_user.id
-            )
-            db.add(c1)
-            db.flush()
-
-            # Case Category Link
-            if "Theft" in cat_map:
-                cc_link = CaseCategoryModel(case_id=c1.id, crime_category_id=cat_map["Theft"].id)
-                db.add(cc_link)
-
-            # Criminal Case Link
-            cr_case = CriminalCaseModel(criminal_id=raj.id, case_id=c1.id, role_in_case="Primary Suspect")
-            db.add(cr_case)
-
-            print("Sample criminal dossier and face embedding seeded.")
 
         db.commit()
-        print("Database seed script executed successfully.")
+        print("Database seed script executed successfully (roles, permissions, stations, users, categories).")
     except Exception as e:
         db.rollback()
         print(f"Database seed failed: {e}")

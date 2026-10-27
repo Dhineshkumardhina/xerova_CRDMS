@@ -25,6 +25,10 @@ class UserModel(Base):
     role_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
     police_station_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("police_stations.id", ondelete="SET NULL"), nullable=True)
     
+    state: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    district: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -43,5 +47,12 @@ class UserModel(Base):
     refresh_tokens: Mapped[List["RefreshTokenModel"]] = relationship("RefreshTokenModel", back_populates="user", cascade="all, delete-orphan")
     investigated_cases: Mapped[List["CaseRecordModel"]] = relationship("CaseRecordModel", back_populates="lead_officer")
     uploaded_documents: Mapped[List["DocumentItemModel"]] = relationship("DocumentItemModel", back_populates="uploaded_by")
+    permission_grants: Mapped[List["UserPermissionGrantModel"]] = relationship(
+        "UserPermissionGrantModel",
+        foreign_keys="UserPermissionGrantModel.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
 User = UserModel
+

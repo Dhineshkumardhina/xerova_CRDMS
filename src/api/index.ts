@@ -91,29 +91,12 @@ export interface ReindexReportResponse {
 export const api = {
   // Auth
   async login(badgeNumber: string): Promise<{ officer: Officer; token: string }> {
-    try {
-      const data = await apiRequest<{ access_token: string; officer: Officer }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ badgeNumber }),
-      });
-      setAuthToken(data.access_token);
-      return { officer: data.officer, token: data.access_token };
-    } catch (err) {
-      console.warn('Backend login fallback:', err);
-      return {
-        token: 'demo-token-123',
-        officer: {
-          id: 'OFF-8829',
-          badgeNumber: badgeNumber || '8829',
-          name: 'Det. Alex Vance',
-          rank: 'Senior Special Agent',
-          department: 'Major Crimes Division // DOJ',
-          clearanceLevel: 'Level 4 - High Security',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
-          status: 'On Duty',
-        },
-      };
-    }
+    const data = await apiRequest<{ access_token: string; officer: Officer }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ badgeNumber }),
+    });
+    setAuthToken(data.access_token);
+    return { officer: data.officer, token: data.access_token };
   },
 
   // Criminal Profiles

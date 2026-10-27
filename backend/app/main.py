@@ -13,9 +13,15 @@ from app.core.rate_limit import rate_limiter
 from app.db.session import engine, get_db
 from app.db.base import Base
 from app.api.v1.router import api_router
+from app.db.session import SessionLocal
+from app.db.migrations import run_db_migrations
 
-# Initialize Database tables
+# Initialize Database tables and apply safe schema migrations / RBAC seeding
 Base.metadata.create_all(bind=engine)
+try:
+    run_db_migrations(engine, SessionLocal)
+except Exception as _e:
+    pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -31,7 +37,7 @@ async def add_security_headers_and_rate_limit(request: Request, call_next):
     # Rate Limiting Enforcement on Sensitive Law Enforcement Endpoints
     try:
         if path == "/api/v1/auth/login" and request.method == "POST":
-            rate_limiter.check_rate_limit(request, endpoint_key="auth_login", max_requests=30, window_seconds=60)
+            rate_limiter.check_rate_limit(request, endpoint_key="auth_login", max_requests=5, window_seconds=60)
         elif (path == "/api/v1/search/photo" or path == "/api/v1/face-search") and request.method == "POST":
             rate_limiter.check_rate_limit(request, endpoint_key="photo_search", max_requests=120, window_seconds=60)
         elif path.startswith("/api/v1/criminals/") and path.endswith("/photos") and request.method == "POST":
@@ -63,7 +69,9 @@ allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "null",
+    "file://",
 ]
 
 app.add_middleware(

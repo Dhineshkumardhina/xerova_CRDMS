@@ -1,13 +1,13 @@
 import { CriminalProfile, Officer, ActivityItem, CategoryStat } from '../types';
 
 export const CURRENT_OFFICER: Officer = {
-  id: 'OFF-8829',
-  badgeNumber: '8829',
-  name: 'Det. Alex Vance',
-  rank: 'Senior Special Agent',
-  department: 'Major Crimes Division // DOJ',
-  clearanceLevel: 'Level 4 - High Security',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
+  id: 'usr-admin-01',
+  badgeNumber: '8829-JD',
+  name: 'Officer J. Daniels',
+  rank: 'Senior Inspector',
+  department: 'Justice Department',
+  clearanceLevel: 'Level 5 - Top Secret',
+  avatarUrl: '/icons/icon-192.png',
   status: 'On Duty',
 };
 

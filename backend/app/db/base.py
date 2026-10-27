@@ -22,3 +22,4 @@ from app.models.document import (
     CaseDocumentModel,
 )
 from app.models.audit_log import AuditLogModel, SearchMetadataModel
+from app.models.token_blacklist import RevokedTokenModel

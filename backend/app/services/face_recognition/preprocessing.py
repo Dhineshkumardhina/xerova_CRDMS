@@ -138,6 +138,12 @@ class ImagePreprocessor:
         if w < config.MIN_IMAGE_DIMENSION or h < config.MIN_IMAGE_DIMENSION:
             raise ImageDimensionTooSmallError(w, h, config.MIN_IMAGE_DIMENSION)
 
+        if w * h > config.MAX_IMAGE_PIXELS:
+            raise ImageTooLargeError(
+                w * h * 3,
+                config.MAX_IMAGE_PIXELS * 3
+            )
+
         rgb_arr = np.array(pil_img, dtype=np.uint8)
         bgr_arr = rgb_arr[:, :, ::-1].copy()  # RGB -> BGR for OpenCV & InsightFace
 

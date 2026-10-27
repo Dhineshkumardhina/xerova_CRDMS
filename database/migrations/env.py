@@ -20,13 +20,17 @@ if config.config_file_name:
 
 target_metadata = Base.metadata
 
+def get_url() -> str:
+    return os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
+
 def run_migrations_offline() -> None:
-    url = settings.DATABASE_URL
+    url = get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=True,
     )
 
     with context.begin_transaction():
@@ -34,16 +38,26 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = get_url()
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
+    from sqlalchemy import event
+    @event.listens_for(connectable, "connect")
+    def disable_sqlite_fks(dbapi_connection, connection_record):
+        if get_url().startswith("sqlite"):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=OFF;")
+            cursor.close()
+
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():

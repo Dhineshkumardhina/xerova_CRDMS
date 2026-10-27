@@ -46,7 +46,7 @@ interface CriminalProfileViewProps {
   onOpenMediaModal: (media: MediaItem) => void;
   onOpenDocModal: (doc: DocumentItem) => void;
   onUploadMedia: (profileId: string, file: File) => void;
-  onUploadDoc: (profileId: string, title: string) => void;
+  onUploadDoc: (profileId: string, file: File) => void;
 }
 
 export const CriminalProfileView: React.FC<CriminalProfileViewProps> = ({
@@ -110,7 +110,7 @@ export const CriminalProfileView: React.FC<CriminalProfileViewProps> = ({
       if (file.type.startsWith('image/')) {
         onUploadMedia(profile.id, file);
       } else {
-        onUploadDoc(profile.id, file.name);
+        onUploadDoc(profile.id, file);
       }
     }
   };

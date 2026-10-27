@@ -21,6 +21,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOffline,
   onToggleOffline,
 }) => {
+  const isSuperAdmin = Boolean(
+    officer.isSuperuser ||
+    officer.role === 'Super Administrator' ||
+    officer.role === 'Super Admin' ||
+    officer.badgeNumber === '8829-JD'
+  );
+
   const navItems: Array<{ id: ActiveTab; label: string; icon: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'search', label: 'Search', icon: 'manage_search' },
@@ -28,6 +35,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'categories', label: 'Categories', icon: 'folder_shared' },
     { id: 'cases', label: 'Cases', icon: 'gavel' },
     { id: 'reports', label: 'Reports', icon: 'description' },
+    ...(isSuperAdmin
+      ? [{ id: 'admin' as ActiveTab, label: 'Admin Hierarchy', icon: 'admin_panel_settings' }]
+      : []),
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
@@ -70,13 +80,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onOpenNewRecord}
-          className="mt-3 w-full bg-[#171717] text-white hover:bg-black text-[12px] font-semibold py-2.5 px-3 rounded-[8px] flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
-        >
-          <Plus className="w-4 h-4 text-white" />
-          <span>New Record</span>
-        </button>
+        {officer.canCreateCriminals && (
+          <button
+            onClick={onOpenNewRecord}
+            className="mt-3 w-full bg-[#171717] text-white hover:bg-black text-[12px] font-semibold py-2.5 px-3 rounded-[8px] flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4 text-white" />
+            <span>New Record</span>
+          </button>
+        )}
       </div>
 
       {/* Primary Nav Tabs */}

@@ -94,53 +94,34 @@ class BiometricMatcher:
             return "LOW"
 
     @classmethod
-    def search_against_templates(
+    def search_against_matrix(
         cls,
-        query_vector: List[float],
+        query_vector: Union[List[float], np.ndarray],
+        vectors_matrix: np.ndarray,
         stored_records: List[Dict[str, Any]],
         threshold: Optional[float] = None,
         max_results: int = 5
     ) -> Tuple[List[MatchCandidate], Optional[Dict[str, Any]], int]:
         """
-        Vectorized 1-to-N face distance comparison across all stored criminal encodings.
-        Uses face_recognition.face_distance to rank candidates by smallest distance.
-        Aggregates multiple photos per criminal by choosing the minimum distance photo.
+        Direct vectorized 1-to-N face distance comparison against pre-stacked numpy matrix.
+        Runs in C/BLAS without Python object allocation or JSON deserialization.
         """
-        # Tolerance: lower is stricter, default 0.60
         applied_tolerance = threshold if threshold is not None else config.DEFAULT_TOLERANCE
-        # Guard against legacy callers passing percentage thresholds (e.g. 75.0%)
         if applied_tolerance > 2.0:
-            # Map legacy percentage to tolerance (e.g. 75% -> 0.60)
             applied_tolerance = 0.60
+        applied_tolerance = max(config.MIN_TOLERANCE, min(config.MAX_TOLERANCE, float(applied_tolerance)))
 
-        if not stored_records or not query_vector:
+        if vectors_matrix is None or len(vectors_matrix) == 0 or len(stored_records) == 0:
             return [], None, 0
 
-        q_vec = np.array(query_vector, dtype=np.float64)
+        q_vec = np.asarray(query_vector, dtype=np.float64).flatten()
+        if q_vec.size != vectors_matrix.shape[1]:
+            return [], None, len(stored_records)
 
-        valid_records: List[Dict[str, Any]] = []
-        valid_vectors: List[List[float]] = []
-        skipped_count = 0
-
-        for rec in stored_records:
-            vec = rec.get("vector")
-            if vec and len(vec) == len(query_vector):
-                valid_records.append(rec)
-                valid_vectors.append(vec)
-            else:
-                skipped_count += 1
-
-        if not valid_vectors:
-            return [], None, skipped_count
-
-        # Compute Euclidean face distances for all stored encodings in a single vectorized operation
-        known_encodings_array = np.array(valid_vectors, dtype=np.float64)
-        distances = face_recognition.face_distance(known_encodings_array, q_vec)
-
-        # Global best candidate tracking (smallest distance)
+        distances = face_recognition.face_distance(vectors_matrix, q_vec)
         best_overall_idx = int(np.argmin(distances))
         best_overall_dist = float(distances[best_overall_idx])
-        best_rec = valid_records[best_overall_idx]
+        best_rec = stored_records[best_overall_idx]
 
         nearest_candidate_info: Optional[Dict[str, Any]] = {
             "criminal_id": best_rec.get("criminal_id"),
@@ -155,7 +136,7 @@ class BiometricMatcher:
         # Multi-photo aggregation per criminal: select smallest distance photo per criminal
         criminal_best_match: Dict[str, MatchCandidate] = {}
 
-        for idx, rec in enumerate(valid_records):
+        for idx, rec in enumerate(stored_records):
             dist = float(distances[idx])
             cid = rec["criminal_id"]
             is_match = bool(dist <= applied_tolerance)
@@ -178,15 +159,55 @@ class BiometricMatcher:
             if cid not in criminal_best_match or dist < criminal_best_match[cid].distance:
                 criminal_best_match[cid] = candidate
 
-        # Collect only candidates passing the tolerance threshold
         passed_matches = [
             cand for cand in criminal_best_match.values()
             if cand.is_above_threshold
         ]
 
-        # Sort by smallest face distance first (best match at index 0)
         passed_matches.sort(key=lambda c: c.distance)
         top_matches = passed_matches[:max_results]
+
+        return top_matches, nearest_candidate_info, 0
+
+    @classmethod
+    def search_against_templates(
+        cls,
+        query_vector: List[float],
+        stored_records: List[Dict[str, Any]],
+        threshold: Optional[float] = None,
+        max_results: int = 5
+    ) -> Tuple[List[MatchCandidate], Optional[Dict[str, Any]], int]:
+        """
+        Vectorized 1-to-N face distance comparison across stored criminal encodings.
+        Uses face_recognition.face_distance to rank candidates by smallest distance.
+        Aggregates multiple photos per criminal by choosing the minimum distance photo.
+        """
+        if not stored_records or not query_vector:
+            return [], None, 0
+
+        valid_records: List[Dict[str, Any]] = []
+        valid_vectors: List[List[float]] = []
+        skipped_count = 0
+
+        for rec in stored_records:
+            vec = rec.get("vector")
+            if vec and len(vec) == len(query_vector):
+                valid_records.append(rec)
+                valid_vectors.append(vec)
+            else:
+                skipped_count += 1
+
+        if not valid_vectors:
+            return [], None, skipped_count
+
+        known_encodings_array = np.array(valid_vectors, dtype=np.float64)
+        top_matches, nearest_candidate_info, _ = cls.search_against_matrix(
+            query_vector=query_vector,
+            vectors_matrix=known_encodings_array,
+            stored_records=valid_records,
+            threshold=threshold,
+            max_results=max_results
+        )
 
         return top_matches, nearest_candidate_info, skipped_count
 

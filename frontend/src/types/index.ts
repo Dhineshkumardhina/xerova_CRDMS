@@ -72,6 +72,11 @@ export interface CaseRecord {
   presidingJudge?: string;
   penalCode?: string;
   notes?: string;
+  title?: string;
+  incidentDate?: string;
+  incidentLocation?: string;
+  complainantName?: string;
+  complainantPhone?: string;
 }
 
 export interface DocumentItem {
@@ -83,6 +88,7 @@ export interface DocumentItem {
   uploadedAt?: string;
   dateUploaded?: string;
   url?: string;
+  isConfidential?: boolean;
 }
 
 export interface MediaItem {
@@ -142,7 +148,34 @@ export interface Officer {
   department: string;
   clearanceLevel: string;
   avatarUrl: string;
-  status: 'On Duty' | 'Off Duty';
+  status: 'On Duty' | 'Off Duty' | 'Active' | 'Suspended' | string;
+  isActive?: boolean;
+  role?: string;
+  region?: string;
+  state?: string;
+  district?: string;
+  policeStationId?: string;
+  isSuperuser?: boolean;
+  canCreateCriminals?: boolean;
+  permissions?: string[];
+}
+
+export interface PermissionGrantItem {
+  id: string;
+  userId: string;
+  username: string;
+  officerName: string;
+  badgeNumber: string;
+  region?: string;
+  permissionCode: string;
+  isGranted: boolean;
+  grantedById?: string;
+  grantedByName?: string;
+  grantedAt?: string;
+  revokedById?: string;
+  revokedByName?: string;
+  revokedAt?: string;
+  reason?: string;
 }
 
 export interface ActivityItem {
@@ -165,4 +198,4 @@ export interface CategoryStat {
   textColorClass: string;
 }
 
-export type ActiveTab = 'dashboard' | 'search' | 'criminals' | 'categories' | 'cases' | 'reports' | 'settings' | 'support' | 'profile';
+export type ActiveTab = 'dashboard' | 'search' | 'criminals' | 'categories' | 'cases' | 'reports' | 'settings' | 'support' | 'profile' | 'admin';

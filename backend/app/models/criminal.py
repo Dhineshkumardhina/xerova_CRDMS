@@ -23,7 +23,11 @@ class CriminalProfileModel(Base):
     
     primary_address: Mapped[Optional[str]] = mapped_column(Text, index=True, nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    district: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
     state: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    police_station_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("police_stations.id", ondelete="SET NULL"), index=True, nullable=True)
+    created_by_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
     
     height: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     weight: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -52,9 +56,12 @@ class CriminalProfileModel(Base):
     face_embeddings: Mapped[List["FaceEmbeddingModel"]] = relationship("FaceEmbeddingModel", back_populates="criminal", cascade="all, delete-orphan")
     case_links: Mapped[List["CriminalCaseModel"]] = relationship("CriminalCaseModel", back_populates="criminal", cascade="all, delete-orphan")
     document_links: Mapped[List["CriminalDocumentModel"]] = relationship("CriminalDocumentModel", back_populates="criminal", cascade="all, delete-orphan")
+    police_station: Mapped[Optional["PoliceStationModel"]] = relationship("PoliceStationModel")
+    created_by: Mapped[Optional["UserModel"]] = relationship("UserModel", foreign_keys=[created_by_id])
 
     __table_args__ = (
         Index("idx_criminal_search", "normalized_name", "status", "city"),
+
     )
 
 class CriminalAliasModel(Base):

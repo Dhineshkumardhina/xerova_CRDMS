@@ -24,6 +24,7 @@ api_router.include_router(categories.router, prefix="/categories", tags=["catego
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(users.permissions_router, prefix="/permissions", tags=["permissions"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(audit.router, prefix="/audit-logs", tags=["audit"])
 api_router.include_router(media.router, prefix="/media", tags=["media"])

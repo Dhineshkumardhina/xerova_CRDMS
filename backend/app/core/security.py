@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import UserModel
 from app.models.role_permission import RoleModel, PermissionModel
+from app.models.token_blacklist import RevokedTokenModel
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
@@ -46,6 +47,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     legacy_hash = hashlib.sha256(legacy_salted).hexdigest()
     return hmac.compare_digest(legacy_hash, hashed_password)
 
+from jose import jwt, JWTError
+import uuid
+
 def create_access_token(subject: Union[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     now = datetime.now(timezone.utc)
     if expires_delta:
@@ -56,62 +60,37 @@ def create_access_token(subject: Union[str, Any], expires_delta: Optional[timede
     to_encode = {
         "sub": str(subject),
         "type": "access",
+        "jti": str(uuid.uuid4()),
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp())
     }
-    return encode_jwt(to_encode)
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_refresh_token(subject: Union[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
     else:
-        expire = now + timedelta(days=7)
+        expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     
     to_encode = {
         "sub": str(subject),
         "type": "refresh",
+        "jti": str(uuid.uuid4()),
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp())
     }
-    return encode_jwt(to_encode)
-
-def encode_jwt(payload: Dict[str, Any]) -> str:
-    header = {"alg": "HS256", "typ": "JWT"}
-    header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
-    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
-    signature_input = f"{header_b64}.{payload_b64}".encode('utf-8')
-    signature = hmac.new(settings.SECRET_KEY.encode('utf-8'), signature_input, hashlib.sha256).digest()
-    sig_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
-    return f"{header_b64}.{payload_b64}.{sig_b64}"
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def decode_jwt(token: str) -> Dict[str, Any]:
     try:
-        parts = token.split('.')
-        if len(parts) != 3:
-            return {}
-        header_b64, payload_b64, sig_b64 = parts
-        signature_input = f"{header_b64}.{payload_b64}".encode('utf-8')
-        expected_sig = hmac.new(settings.SECRET_KEY.encode('utf-8'), signature_input, hashlib.sha256).digest()
-        
-        rem = len(sig_b64) % 4
-        if rem > 0:
-            sig_b64 += "=" * (4 - rem)
-        actual_sig = base64.urlsafe_b64decode(sig_b64)
-        
-        if not hmac.compare_digest(expected_sig, actual_sig):
-            return {}
-
-        rem_p = len(payload_b64) % 4
-        if rem_p > 0:
-            payload_b64 += "=" * (4 - rem_p)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode())
-        
-        exp = payload.get("exp")
-        if exp and datetime.now(timezone.utc).timestamp() > exp:
-            return {}
-        return payload
-    except Exception:
+        return jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": True, "verify_signature": True}
+        )
+    except JWTError:
         return {}
 
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
@@ -144,6 +123,17 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Persistent Access Token Blacklist Verification
+    jti = payload.get("jti")
+    if jti:
+        revoked = db.query(RevokedTokenModel).filter(RevokedTokenModel.jti == jti).first()
+        if revoked:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     user_id: str = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
@@ -157,20 +147,59 @@ def get_current_user(
 
     return user
 
+def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Optional[UserModel]:
+    raw_token = token
+    if not raw_token and authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split(" ")[1]
+
+    if not raw_token:
+        return None
+
+    payload = decode_jwt(raw_token)
+    if not payload or payload.get("type") != "access":
+        return None
+
+    jti = payload.get("jti")
+    if jti:
+        revoked = db.query(RevokedTokenModel).filter(RevokedTokenModel.jti == jti).first()
+        if revoked:
+            return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    return db.query(UserModel).filter(UserModel.id == user_id, UserModel.is_active == True).first()
+
 class PermissionChecker:
     def __init__(self, permission_code: str):
         self.permission_code = permission_code
 
-    def __call__(self, current_user: UserModel = Depends(get_current_user)) -> UserModel:
+    def __call__(
+        self,
+        current_user: UserModel = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> UserModel:
         if current_user.is_superuser:
             return current_user
 
-        user_permissions = set()
-        if current_user.role and current_user.role.permissions:
-            for perm in current_user.role.permissions:
-                user_permissions.add(perm.code)
+        # Dedicated check for criminal record creation permission
+        if self.permission_code in ("criminal_records.create", "criminal:create"):
+            from app.core.rbac import has_criminal_create_permission
+            if not has_criminal_create_permission(current_user, db):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access Denied: Explicit 'criminal_records.create' permission granted by Super Admin is required for this operation."
+                )
+            return current_user
 
-        if self.permission_code not in user_permissions:
+        from app.core.rbac import resolve_jurisdiction
+        jurisdiction = resolve_jurisdiction(current_user, db)
+        if not jurisdiction.has_permission(self.permission_code):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access Denied: Permission '{self.permission_code}' is required for this operation."
@@ -180,3 +209,47 @@ class PermissionChecker:
 
 def require_permission(permission_code: str):
     return PermissionChecker(permission_code)
+
+def require_super_admin(
+    current_user: UserModel = Depends(get_current_user)
+) -> UserModel:
+    from app.core.rbac import ROLE_SUPER_ADMIN, ROLE_SUPER_ADMIN_ALIAS
+    role_name = current_user.role.name if current_user.role else ""
+    if not (current_user.is_superuser or role_name in (ROLE_SUPER_ADMIN, ROLE_SUPER_ADMIN_ALIAS)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Super Administrator privileges are required for this action."
+        )
+    return current_user
+
+class AnyPermissionChecker:
+    def __init__(self, *permission_codes: str):
+        self.permission_codes = set(permission_codes)
+
+    def __call__(
+        self,
+        current_user: UserModel = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> UserModel:
+        if current_user.is_superuser:
+            return current_user
+
+        from app.core.rbac import resolve_jurisdiction, has_criminal_create_permission
+        jurisdiction = resolve_jurisdiction(current_user, db)
+
+        for code in self.permission_codes:
+            if code in ("criminal_records.create", "criminal:create"):
+                if has_criminal_create_permission(current_user, db):
+                    return current_user
+            elif jurisdiction.has_permission(code):
+                return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access Denied: One of permissions {sorted(list(self.permission_codes))} is required for this operation."
+        )
+
+def require_any_permission(*permission_codes: str):
+    return AnyPermissionChecker(*permission_codes)
+
+

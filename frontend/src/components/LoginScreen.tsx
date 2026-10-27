@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldAlert, KeyRound, ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, ShieldAlert, KeyRound, ArrowRight, CheckCircle2, Info, Server } from 'lucide-react';
 import { Officer } from '../types';
+import { getApiBaseUrl } from '../api/client';
 
 interface LoginScreenProps {
   onLogin: (officerId: string, password?: string) => Promise<void> | void;
@@ -15,54 +16,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   currentOfficer,
   onReturnToDashboard,
 }) => {
-  const [officerId, setOfficerId] = useState('8829-JD');
-  const [password, setPassword] = useState('DeptJusticeSecure#2024');
+  const [officerId, setOfficerId] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberSession, setRememberSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isServerOffline, setIsServerOffline] = useState(false);
+  const [showResetNotice, setShowResetNotice] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showServerSettings, setShowServerSettings] = useState(false);
+  const [serverUrl, setServerUrl] = useState(() => getApiBaseUrl());
+  const [testingServer, setTestingServer] = useState(false);
+  const [serverStatus, setServerStatus] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!officerId.trim()) {
-      setErrorMessage('Officer ID / Username is required');
+      setErrorMessage('Officer ID / Badge number is required');
+      return;
+    }
+    if (!password) {
+      setErrorMessage('Password is required');
       return;
     }
     setIsLoading(true);
     setErrorMessage('');
-    setIsServerOffline(false);
+    setShowResetNotice(false);
     try {
       await onLogin(officerId.trim(), password);
     } catch (err: any) {
       const msg = err.message || 'Authentication failed. Please check credentials.';
       setErrorMessage(msg);
-      if (
-        msg.includes('Failed to fetch') ||
-        msg.includes('NetworkError') ||
-        msg.includes('connection')
-      ) {
-        setIsServerOffline(true);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDemoFill = () => {
-    setOfficerId('8829-JD');
-    setPassword('DeptJusticeSecure#2024');
-    setErrorMessage('');
-    setIsServerOffline(false);
-  };
-
-  const handleInstantDemoLogin = async () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      await onLogin('8829-JD', 'DeptJusticeSecure#2024');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Demo authentication failed.');
     } finally {
       setIsLoading(false);
     }
@@ -175,45 +158,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           </div>
 
-          {/* Demo Credentials Quick Info Box */}
-          <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-[12px]">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-slate-600 shrink-0" />
-              <div>
-                <span className="font-semibold text-slate-900">Demo Badge:</span>{' '}
-                <code className="bg-slate-200/80 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-800">8829-JD</code>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleDemoFill}
-              className="text-[11px] font-bold text-slate-700 hover:text-slate-900 underline underline-offset-2 cursor-pointer"
-            >
-              Autofill
-            </button>
-          </div>
-
           {errorMessage && (
-            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[12px] flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span className="font-medium">{errorMessage}</span>
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[12px] flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span className="font-medium">{errorMessage}</span>
+            </div>
+          )}
+
+          {showResetNotice && (
+            <div className="mb-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-[12px] flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+              <div className="leading-[18px]">
+                <strong className="text-slate-900 font-semibold">Credential Reset Protocol:</strong> In accordance with CJIS standards, badge credentials cannot be reset remotely. Contact your precinct systems administrator with your official badge ID.
               </div>
-              {isServerOffline && (
-                <div className="pt-2 border-t border-rose-200/80 flex flex-col gap-1.5">
-                  <p className="text-[11px] text-rose-600">
-                    The backend API server (port 8000) is unreachable. You can continue instantly in offline / demo mode.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleInstantDemoLogin}
-                    className="w-full py-1.5 px-3 bg-slate-900 hover:bg-black text-white text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Proceed in Demo Mode</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -222,15 +179,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-[12px] font-semibold text-neutral-800" htmlFor="officer-id">
-                  Officer ID / Username
+                  Officer ID / Badge Number
                 </label>
-                <button
-                  type="button"
-                  onClick={handleDemoFill}
-                  className="text-[11px] font-medium text-slate-700 hover:text-slate-900 flex items-center gap-1 underline underline-offset-2 cursor-pointer"
-                >
-                  <KeyRound className="w-3 h-3" /> Quick Demo Fill
-                </button>
               </div>
               <input
                 id="officer-id"
@@ -285,7 +235,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </label>
               <button
                 type="button"
-                onClick={() => alert('Credentials recovery link has been dispatched to official DOJ tele-terminal 8829.')}
+                onClick={() => setShowResetNotice(!showResetNotice)}
                 className="text-[12px] font-semibold text-neutral-700 hover:text-neutral-900 hover:underline underline-offset-2 cursor-pointer"
               >
                 Forgot password?
@@ -293,7 +243,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             {/* Primary Action Button */}
-            <div className="pt-2 flex flex-col gap-2.5">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isLoading}
@@ -311,22 +261,113 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </span>
                 )}
               </button>
+            </div>
 
-              {/* Instant One-Click Demo Mode Button */}
-              <button
-                type="button"
-                onClick={handleInstantDemoLogin}
-                disabled={isLoading}
-                className="w-full h-10 flex justify-center items-center bg-slate-100 hover:bg-slate-200 text-slate-800 text-[12px] font-semibold rounded-xl border border-slate-200 transition-colors cursor-pointer"
-              >
-                <ShieldCheck className="w-4 h-4 mr-1.5 text-slate-600" />
-                Quick Launch (Demo Mode)
-              </button>
+            {/* Quick Access Credentials Helper */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-500 mb-1.5">
+                <span>Demo Law Enforcement Credentials:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOfficerId('8829-JD');
+                    setPassword('DeptJusticeSecure#2024');
+                    setErrorMessage('');
+                  }}
+                  className="px-3 py-2 bg-white hover:bg-neutral-100 border border-[#E5E7EB] rounded-xl text-left transition-colors cursor-pointer shadow-xs group"
+                >
+                  <div className="text-[11px] font-bold text-neutral-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Super Admin</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-neutral-500 group-hover:text-neutral-800">
+                    8829-JD • DeptJusticeSecure#2024
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOfficerId('7710-SO');
+                    setPassword('OfficerSecure#2024');
+                    setErrorMessage('');
+                  }}
+                  className="px-3 py-2 bg-white hover:bg-neutral-100 border border-[#E5E7EB] rounded-xl text-left transition-colors cursor-pointer shadow-xs group"
+                >
+                  <div className="text-[11px] font-bold text-neutral-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-500" />
+                    <span>Police Member</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-neutral-500 group-hover:text-neutral-800">
+                    7710-SO • OfficerSecure#2024
+                  </div>
+                </button>
+              </div>
             </div>
           </form>
 
           <div className="mt-8 pt-6 border-t border-[#E5E7EB] text-center">
-            <p className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => setShowServerSettings(!showServerSettings)}
+              className="text-[11px] font-mono text-neutral-500 hover:text-neutral-800 flex items-center justify-center gap-1.5 mx-auto cursor-pointer transition-colors"
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>Backend Server: {serverUrl}</span>
+            </button>
+
+            {showServerSettings && (
+              <div className="mt-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-left">
+                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                  API Endpoint URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={serverUrl}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                    placeholder="https://server.domain/api/v1"
+                    className="flex-1 px-2.5 py-1.5 text-[12px] bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setTestingServer(true);
+                      setServerStatus(null);
+                      try {
+                        const target = serverUrl.replace(/\/+$/, '');
+                        const res = await fetch(`${target}/health`, { method: 'GET', signal: AbortSignal.timeout(5000) });
+                        if (res.ok) {
+                          localStorage.setItem('crms_api_base_url', target);
+                          setServerStatus('Online - Connected successfully');
+                        } else {
+                          setServerStatus(`Error: HTTP ${res.status}`);
+                        }
+                      } catch (err: any) {
+                        setServerStatus('Offline: Could not connect to host');
+                      } finally {
+                        setTestingServer(false);
+                      }
+                    }}
+                    disabled={testingServer}
+                    className="px-3 py-1.5 bg-neutral-900 text-white text-[11px] font-bold rounded-lg hover:bg-black transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {testingServer ? 'Testing...' : 'Save & Test'}
+                  </button>
+                </div>
+                {serverStatus && (
+                  <p className={`mt-1.5 text-[11px] font-medium ${serverStatus.includes('Online') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {serverStatus}
+                  </p>
+                )}
+                <p className="mt-1.5 text-[10px] text-neutral-400">
+                  Default on Android: <code className="bg-neutral-200 px-1 py-0.5 rounded">http://10.0.2.2:8000/api/v1</code> for emulator or intranet HTTPS URL.
+                </p>
+              </div>
+            )}
+
+            <p className="mt-4 text-[11px] font-mono text-neutral-400 uppercase tracking-wider">
               Department of Justice Secure Gateway
             </p>
           </div>

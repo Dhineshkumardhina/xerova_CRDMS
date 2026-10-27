@@ -1,6 +1,5 @@
-import { apiRequest, setAuthTokens, clearTokens, API_BASE_URL } from './client';
-import { CriminalProfile, CaseStatus, Officer, ActivityItem } from '../types';
-import { CURRENT_OFFICER } from '../constants/mockData';
+import { apiRequest, setAuthTokens, clearTokens, getApiBaseUrl } from './client';
+import { CriminalProfile, CaseStatus, Officer, ActivityItem, PermissionGrantItem } from '../types';
 
 export interface SearchParams {
   q?: string;
@@ -36,45 +35,18 @@ export interface SearchResponse {
 export const api = {
   // Auth
   async login(officerId: string, password?: string): Promise<{ officer: Officer; token: string }> {
-    try {
-      const data = await apiRequest<{ access_token: string; refresh_token: string; officer: Officer }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ officerId, password }),
-      });
-      setAuthTokens(data.access_token, data.refresh_token);
-      return { officer: data.officer, token: data.access_token };
-    } catch (err: any) {
-      console.warn('Backend login request error:', err);
-
-      const isNetworkError =
-        !navigator.onLine ||
-        err.message?.includes('Failed to fetch') ||
-        err.message?.includes('NetworkError') ||
-        err.message?.includes('network') ||
-        err.message?.includes('connection') ||
-        err.message?.includes('Load failed');
-
-      // If backend is unreachable or demo credentials are used, fall back gracefully to demo session
-      const isDemoUser = officerId === '8829-JD' || officerId === '8829' || !password || password === 'DeptJusticeSecure#2024';
-      if (isNetworkError || isDemoUser) {
-        const demoToken = 'demo-session-' + Date.now();
-        setAuthTokens(demoToken, 'demo-refresh-token');
-        const fallbackOfficer: Officer = {
-          ...CURRENT_OFFICER,
-          badgeNumber: officerId || '8829-JD',
-          name: officerId === '8829-JD' ? 'Officer J. Daniels' : CURRENT_OFFICER.name,
-        };
-        return { officer: fallbackOfficer, token: demoToken };
-      }
-
-      throw err;
-    }
+    const data = await apiRequest<{ access_token: string; refresh_token: string; officer: Officer }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ officerId, password: password || '' }),
+    });
+    setAuthTokens(data.access_token, data.refresh_token);
+    return { officer: data.officer, token: data.access_token };
   },
 
   async logout(): Promise<void> {
     try {
       const refreshToken = localStorage.getItem('crms_refresh_token');
-      if (refreshToken && !refreshToken.startsWith('demo-')) {
+      if (refreshToken) {
         await apiRequest('/auth/logout', {
           method: 'POST',
           body: JSON.stringify({ refresh_token: refreshToken }),
@@ -88,14 +60,24 @@ export const api = {
   },
 
   async getMe(): Promise<Officer> {
+    return await apiRequest<Officer>('/auth/me');
+  },
+
+  async getOfficers(): Promise<Officer[]> {
     try {
-      return await apiRequest<Officer>('/auth/me');
-    } catch (err: any) {
-      const token = localStorage.getItem('crms_access_token');
-      if (token && (token.startsWith('demo-') || !navigator.onLine || err.message?.includes('Failed to fetch'))) {
-        return CURRENT_OFFICER;
-      }
-      throw err;
+      return await apiRequest<Officer[]>('/users');
+    } catch (err) {
+      console.warn('Backend users/officers unavailable:', err);
+      return [];
+    }
+  },
+
+  async getCategories(): Promise<any[]> {
+    try {
+      return await apiRequest<any[]>('/categories');
+    } catch (err) {
+      console.warn('Backend categories unavailable:', err);
+      return [];
     }
   },
 
@@ -140,7 +122,8 @@ export const api = {
     formData.append('file', file);
     formData.append('is_primary', isPrimary ? 'true' : 'false');
 
-    const response = await fetch(`${API_BASE_URL}/criminals/${criminalId}/photos`, {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/criminals/${criminalId}/photos`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
@@ -177,7 +160,8 @@ export const api = {
     if (criminalId) formData.append('criminal_id', criminalId);
     if (caseId) formData.append('case_id', caseId);
 
-    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/documents/upload`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
@@ -200,7 +184,7 @@ export const api = {
   },
 
   async downloadDocumentUrl(documentId: string): Promise<string> {
-    return `${API_BASE_URL}/documents/${documentId}/download`;
+    return `${getApiBaseUrl()}/documents/${documentId}/download`;
   },
 
   async deleteDocument(documentId: string): Promise<void> {
@@ -232,7 +216,106 @@ export const api = {
     return await apiRequest<SearchResponse>(`/search${queryString}`);
   },
 
-  // Cases Bulk Update
+  // Cases & FIR Management API
+  async getCases(status?: string, category?: string): Promise<any[]> {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (category) params.push(`category=${encodeURIComponent(category)}`);
+    const q = params.length > 0 ? `?${params.join('&')}` : '';
+    return await apiRequest<any[]>(`/cases${q}`);
+  },
+
+  async createCase(caseData: {
+    caseNumber?: string;
+    title?: string;
+    description: string;
+    category?: string;
+    status?: string;
+    dateFiled?: string;
+    incidentDate?: string;
+    incidentLocation?: string;
+    complainantName?: string;
+    complainantPhone?: string;
+    penalCode?: string;
+    courtRoom?: string;
+    presidingJudge?: string;
+    courtroomNotes?: string;
+    notes?: string;
+    penalties?: string;
+    suspectIds?: string[];
+  }): Promise<any> {
+    return await apiRequest('/cases', {
+      method: 'POST',
+      body: JSON.stringify(caseData),
+    });
+  },
+
+  async getCaseDetail(caseId: string): Promise<any> {
+    return await apiRequest(`/cases/${caseId}/detail`);
+  },
+
+  async updateCase(caseId: string, updateData: {
+    title?: string;
+    description?: string;
+    category?: string;
+    status?: string;
+    incidentDate?: string;
+    incidentLocation?: string;
+    complainantName?: string;
+    complainantPhone?: string;
+    penalCode?: string;
+    courtRoom?: string;
+    presidingJudge?: string;
+    courtroomNotes?: string;
+    notes?: string;
+    penalties?: string;
+  }): Promise<any> {
+    return await apiRequest(`/cases/${caseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  },
+
+  async addCaseActivity(
+    caseId: string,
+    titleOrObj: string | { title?: string; description?: string; activityType?: string },
+    description?: string,
+    activityType: string = 'Investigation Note'
+  ): Promise<any> {
+    let payload: { title: string; description: string; activityType: string };
+    if (typeof titleOrObj === 'object' && titleOrObj !== null) {
+      payload = {
+        title: titleOrObj.title || 'Investigation Update',
+        description: titleOrObj.description || '',
+        activityType: titleOrObj.activityType || 'Investigation Note',
+      };
+    } else {
+      payload = {
+        title: typeof titleOrObj === 'string' ? titleOrObj : 'Investigation Update',
+        description: description || '',
+        activityType: activityType || 'Investigation Note',
+      };
+    }
+    return await apiRequest(`/cases/${caseId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async linkPersonToCase(caseId: string, criminalId: string, roleInCase: string = 'Primary Suspect'): Promise<any> {
+    return await apiRequest(`/cases/${caseId}/link-person`, {
+      method: 'POST',
+      body: JSON.stringify({ criminalId, roleInCase }),
+    });
+  },
+
+  async assignCaseOfficer(caseId: string, leadOfficerId: string): Promise<any> {
+    return await apiRequest(`/cases/${caseId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ leadOfficerId }),
+    });
+  },
+
   async bulkUpdateCaseStatus(caseIds: string[], newStatus: CaseStatus): Promise<void> {
     try {
       await apiRequest('/cases/bulk-status', {
@@ -242,6 +325,28 @@ export const api = {
     } catch (err) {
       console.warn('Backend bulk case update failed:', err);
     }
+  },
+
+  async downloadDocument(documentId: string, filename?: string): Promise<void> {
+    const token = localStorage.getItem('crms_access_token');
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/documents/${documentId}/download`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Failed to download document' }));
+      throw new Error(err.detail || 'Download failed');
+    }
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename || `document_${documentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   },
 
   // Facial Recognition Search
@@ -297,4 +402,50 @@ export const api = {
   }> {
     return await apiRequest('/analytics/summary');
   },
+
+  // Hierarchical RBAC & User Management
+  async createUser(userData: {
+    username: string;
+    password?: string;
+    fullName: string;
+    badgeNumber: string;
+    rank?: string;
+    department?: string;
+    clearanceLevel?: string;
+    roleName?: string;
+    roleId?: string;
+    region?: string;
+    district?: string;
+    state?: string;
+    policeStationId?: string;
+  }): Promise<Officer> {
+    return await apiRequest<Officer>('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  async updateUser(userId: string, updateData: Partial<Officer> & { isActive?: boolean; roleName?: string; roleId?: string }): Promise<Officer> {
+    return await apiRequest<Officer>(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  },
+
+  async grantCriminalRecordPermission(userId: string, granted: boolean, reason?: string): Promise<{ isGranted: boolean; message: string }> {
+    return await apiRequest<{ isGranted: boolean; message: string }>(`/users/${userId}/permissions/criminal-create`, {
+      method: 'POST',
+      body: JSON.stringify({ granted, reason }),
+    });
+  },
+
+  async getCriminalPermissionGrants(): Promise<PermissionGrantItem[]> {
+    try {
+      return await apiRequest<PermissionGrantItem[]>('/permissions/criminal-create-grants');
+    } catch (err) {
+      console.warn('Unable to fetch criminal create grants:', err);
+      return [];
+    }
+  },
 };
+

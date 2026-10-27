@@ -189,6 +189,66 @@ class StorageService:
                 detail=f"Invalid document file extension '{ext}'. Allowed extensions: {', '.join(ALLOWED_DOC_EXTENSIONS)}"
             )
 
+        # Validate against executable / malicious file signatures
+        # Windows PE executable (MZ)
+        if file_bytes[:2] == b"MZ":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security rejection: Windows executable (PE/MZ) binary detected."
+            )
+        # Linux ELF executable
+        if file_bytes[:4] == b"\x7fELF":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security rejection: Linux executable (ELF) binary detected."
+            )
+        # Script execution markers
+        if file_bytes[:2] == b"#!" or file_bytes[:5].lower() == b"<?php":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security rejection: Executable script detected."
+            )
+
+        # File signature verification based on declared extension
+        if ext == ".pdf":
+            if not file_bytes.startswith(b"%PDF-"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid PDF file: Missing standard %PDF- header signature."
+                )
+        elif ext in (".png",):
+            if not file_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid PNG image file: Missing PNG header signature."
+                )
+        elif ext in (".jpg", ".jpeg"):
+            if not (file_bytes.startswith(b"\xff\xd8\xff") or file_bytes[:2] == b"\xff\xd8"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid JPEG image file: Missing JPEG SOI marker."
+                )
+        elif ext == ".docx":
+            if not file_bytes.startswith(b"PK\x03\x04"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid DOCX document: Missing ZIP container header signature."
+                )
+        elif ext == ".doc":
+            if not file_bytes.startswith(b"\xd0\xcf\x11\xe0"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid DOC document: Missing OLE Compound File header signature."
+                )
+        elif ext == ".txt":
+            try:
+                file_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid text document: Non-text binary data detected."
+                )
+
         file_hash = hashlib.sha256(file_bytes).hexdigest()
         unique_id = uuid.uuid4().hex
         safe_ext = ext.lstrip(".")

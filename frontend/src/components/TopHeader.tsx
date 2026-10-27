@@ -131,48 +131,20 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full ring-2 ring-white" />
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white border border-[#E5E7EB] rounded-xl shadow-xl py-2 z-50">
               <div className="px-4 py-2.5 border-b border-[#E5E7EB] flex justify-between items-center bg-[#F8F9FA]">
                 <span className="text-[12px] font-bold text-neutral-900 uppercase tracking-wider">
-                  System Alerts (3)
+                  System Alerts
                 </span>
                 <span className="text-[10px] font-mono text-neutral-500 font-semibold">Realtime Feed</span>
               </div>
-              <div className="divide-y divide-[#E5E7EB] max-h-64 overflow-y-auto">
-                <div className="p-3 hover:bg-neutral-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-red-600" />
-                    <span className="text-[11px] font-bold text-red-700">FEDERAL BENCH WARRANT</span>
-                    <span className="text-[10px] text-neutral-400 ml-auto">10m ago</span>
-                  </div>
-                  <p className="text-[12px] text-neutral-800">
-                    Warrant signed for <strong>Kowalski, J. (#883-99A-XY)</strong> in District 9.
-                  </p>
-                </div>
-                <div className="p-3 hover:bg-neutral-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-neutral-600" />
-                    <span className="text-[11px] font-bold text-neutral-900">EVIDENCE SUBMISSION</span>
-                    <span className="text-[10px] text-neutral-400 ml-auto">1h ago</span>
-                  </div>
-                  <p className="text-[12px] text-neutral-800">
-                    Forensic photo uploaded for <strong>Raj Kumar (CR-001245)</strong>.
-                  </p>
-                </div>
-                <div className="p-3 hover:bg-neutral-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                    <span className="text-[11px] font-bold text-emerald-800">CASE CLOSED</span>
-                    <span className="text-[10px] text-neutral-400 ml-auto">4h ago</span>
-                  </div>
-                  <p className="text-[12px] text-neutral-800">
-                    Investigation closed on record <strong>CR-552-88B</strong>.
-                  </p>
-                </div>
+              <div className="p-6 text-center text-neutral-500">
+                <Bell className="w-7 h-7 text-neutral-300 mx-auto mb-2" />
+                <div className="text-[13px] font-semibold text-neutral-800">No Active Alerts</div>
+                <p className="text-[11px] text-neutral-400 mt-0.5">All monitored systems and warrants are operational.</p>
               </div>
             </div>
           )}

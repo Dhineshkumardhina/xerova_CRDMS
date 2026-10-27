@@ -55,7 +55,8 @@ def search_records(
         page=page,
         page_size=pageSize,
         sort_by=sortBy,
-        sort_order=sortOrder
+        sort_order=sortOrder,
+        current_user=current_user
     )
 
     execution_time = round((time.time() - start_time) * 1000, 2)

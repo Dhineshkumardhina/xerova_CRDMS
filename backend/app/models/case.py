@@ -43,6 +43,21 @@ class CriminalCaseModel(Base):
     criminal: Mapped["CriminalProfileModel"] = relationship("CriminalProfileModel", back_populates="case_links")
     case: Mapped["CaseRecordModel"] = relationship("CaseRecordModel", back_populates="criminal_links")
 
+class CaseActivityModel(Base):
+    __tablename__ = "case_activities"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
+    officer_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    activity_type: Mapped[str] = mapped_column(String(50), default="Investigation Note")
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    case: Mapped["CaseRecordModel"] = relationship("CaseRecordModel", back_populates="activities")
+    officer: Mapped[Optional["UserModel"]] = relationship("UserModel")
+
 class CaseRecordModel(Base):
     __tablename__ = "cases"
 
@@ -56,6 +71,17 @@ class CaseRecordModel(Base):
     
     police_station_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("police_stations.id", ondelete="SET NULL"), index=True, nullable=True)
     lead_officer_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+
+    incident_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    incident_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    complainant_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    complainant_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    penal_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    court_room: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    presiding_judge: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    courtroom_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    penalties: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     is_archived: Mapped[bool] = mapped_column(Boolean, index=True, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, index=True, default=False)
@@ -70,3 +96,5 @@ class CaseRecordModel(Base):
     category_links: Mapped[List[CaseCategoryModel]] = relationship("CaseCategoryModel", back_populates="case", cascade="all, delete-orphan")
     criminal_links: Mapped[List[CriminalCaseModel]] = relationship("CriminalCaseModel", back_populates="case", cascade="all, delete-orphan")
     document_links: Mapped[List["CaseDocumentModel"]] = relationship("CaseDocumentModel", back_populates="case", cascade="all, delete-orphan")
+    activities: Mapped[List[CaseActivityModel]] = relationship("CaseActivityModel", back_populates="case", cascade="all, delete-orphan")
+

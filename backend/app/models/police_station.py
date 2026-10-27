@@ -14,6 +14,7 @@ class PoliceStationModel(Base):
     name: Mapped[str] = mapped_column(String(150), index=True, nullable=False)
     district: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     state: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    region: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     phone_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

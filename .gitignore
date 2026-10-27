@@ -14,6 +14,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
@@ -26,4 +28,16 @@ storage/media/*
 # Environments
 .venv/
 venv/
+
+# Desktop & Mobile Build Distributions
+dist-electron/
+dist-android/
+
+# Android Keystores & Local Configs
+*.jks
+*.keystore
+signing.properties
+android/local.properties
+android/.gradle/
+android/app/build/
 

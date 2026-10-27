@@ -357,13 +357,21 @@ export const PhotoSearchModal: React.FC<PhotoSearchModalProps> = ({
           {/* Biometric Candidate Results */}
           {matchedResults.length > 0 && !isScanning && (
             <div className="border border-[#E5E7EB] rounded-xl p-4 bg-neutral-50 space-y-3">
+              {/* Mandatory Human Review Safeguard Banner */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-amber-800 leading-snug">
+                  <strong>Investigative Leads Only:</strong> Similarity scores provide candidate ranking and do not establish legal proof of identity. Independent human review is required before taking any official action.
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-neutral-900 font-bold text-[13px]">
                   <UserCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Biometric Vector Match — Potential Matches</span>
+                  <span>Biometric Vector Match — Candidate Leads</span>
                 </div>
                 <span className="text-[11px] font-mono text-neutral-500">
-                  MODEL: DOJ-NEURALMESH-V4.2
+                  MODEL: DLIB RESNET-34 (128-D)
                 </span>
               </div>
 
@@ -372,6 +380,8 @@ export const PhotoSearchModal: React.FC<PhotoSearchModalProps> = ({
                   const profile = item?.profile;
                   if (!profile) return null;
                   const confidence = item.confidence ?? (item as any).similarityScore ?? 0;
+                  const distance = (item as any).distance;
+                  const confidenceLevel = (item as any).confidenceLevel || (confidence >= 80 ? 'HIGH' : confidence >= 65 ? 'MEDIUM' : 'LOW');
                   return (
                     <div
                       key={profile.id || idx}
@@ -396,7 +406,20 @@ export const PhotoSearchModal: React.FC<PhotoSearchModalProps> = ({
                           <div className="text-[15px] font-bold font-mono text-neutral-900">
                             {confidence}%
                           </div>
-                          <div className="text-[10px] text-emerald-700 font-bold uppercase">Potential Match</div>
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                              confidenceLevel === 'HIGH' ? 'bg-emerald-100 text-emerald-800' :
+                              confidenceLevel === 'MEDIUM' ? 'bg-blue-100 text-blue-800' :
+                              'bg-amber-100 text-amber-800'
+                            }`}>
+                              {confidenceLevel} CONFIDENCE
+                            </span>
+                          </div>
+                          {typeof distance === 'number' && (
+                            <div className="text-[10px] text-neutral-400 font-mono">
+                              dist: {distance.toFixed(4)}
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={() => {
@@ -405,7 +428,7 @@ export const PhotoSearchModal: React.FC<PhotoSearchModalProps> = ({
                           }}
                           className="px-3.5 py-1.5 bg-neutral-900 text-white text-[12px] font-semibold rounded-lg hover:bg-black cursor-pointer shadow-xs transition-colors"
                         >
-                          Open Dossier
+                          Review Dossier
                         </button>
                       </div>
                     </div>
@@ -419,7 +442,7 @@ export const PhotoSearchModal: React.FC<PhotoSearchModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-[#E5E7EB] bg-[#F8F9FA] flex justify-between items-center">
           <span className="text-[11px] text-neutral-500">
-            Algorithm: DOJ Neural Mesh Vector Engine v4.2
+            Engine: ResNet-34 128-D Metric Pipeline (dlib / ageitgey)
           </span>
           <button
             onClick={handleClose}

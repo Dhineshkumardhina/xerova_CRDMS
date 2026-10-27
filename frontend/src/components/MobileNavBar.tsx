@@ -19,11 +19,19 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
   subPageTitle = '',
   onBack,
 }) => {
+  const isSuperAdmin = Boolean(
+    officer.isSuperuser ||
+    officer.role === 'Super Administrator' ||
+    officer.role === 'Super Admin' ||
+    officer.badgeNumber === '8829-JD'
+  );
+
   const bottomTabs: Array<{ id: ActiveTab; label: string; icon: string }> = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'search', label: 'Search', icon: 'manage_search' },
     { id: 'criminals', label: 'Criminals', icon: 'person_search' },
     { id: 'cases', label: 'Cases', icon: 'gavel' },
+    ...(isSuperAdmin ? [{ id: 'admin' as ActiveTab, label: 'Admin', icon: 'admin_panel_settings' }] : []),
   ];
 
   return (

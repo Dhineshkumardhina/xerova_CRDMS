@@ -1,10 +1,18 @@
 import uuid
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Request, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
-from app.core.security import require_permission
+from app.core.security import require_permission, get_current_user, require_any_permission
+from app.core.rbac import (
+    can_access_criminal,
+    apply_criminal_scope,
+    resolve_jurisdiction,
+    has_criminal_create_permission,
+    ROLE_REGIONAL_ADMIN,
+    ROLE_STATE_ADMIN
+)
 from app.services.storage_service import storage_service
 from app.services.face_recognition import extract_face_embedding, MODEL_VERSION
 from app.services.audit_service import log_audit_event
@@ -103,6 +111,10 @@ def get_criminals(
     current_user: UserModel = Depends(require_permission("criminal:read"))
 ):
     query = db.query(CriminalProfileModel).filter(CriminalProfileModel.is_deleted == False)
+    
+    # Enforce regional jurisdiction boundary
+    query = apply_criminal_scope(query, current_user, db)
+
     if category:
         query = query.filter(CriminalProfileModel.category == category)
     if search:
@@ -131,6 +143,24 @@ def get_criminal_by_id(
     if not profile:
         raise HTTPException(status_code=404, detail="Criminal profile not found")
 
+    # Enforce regional jurisdiction boundary
+    if not can_access_criminal(current_user, profile, db):
+        log_audit_event(
+            db=db,
+            action="ACCESS_DENIED",
+            resource_type="Criminal",
+            resource_id=profile.id,
+            subject_name=profile.name,
+            result="FAILED",
+            user_id=current_user.id,
+            officer_name=current_user.full_name,
+            request=request
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Jurisdictional restriction. You do not have clearance for this regional record."
+        )
+
     log_audit_event(
         db=db,
         action="View Criminal",
@@ -147,8 +177,9 @@ def get_criminal_by_id(
 @router.post("", response_model=CriminalProfileSchema)
 def save_criminal(
     data: CriminalProfileSchema,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_permission("criminal:create"))
+    current_user: UserModel = Depends(require_any_permission("criminal_records.create", "criminal:create", "criminal:update"))
 ):
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=400, detail="Subject name is required and cannot be empty.")
@@ -156,6 +187,79 @@ def save_criminal(
     target_id = (data.id and data.id.strip()) or f"CR-{uuid.uuid4().hex[:8].upper()}"
     existing = db.query(CriminalProfileModel).filter(CriminalProfileModel.id == target_id).first()
     
+    jurisdiction = resolve_jurisdiction(current_user, db)
+
+    if existing:
+        # Updating existing profile requires criminal:update permission
+        if not jurisdiction.has_permission("criminal:update"):
+            log_audit_event(
+                db=db,
+                action="UNAUTHORIZED_MODIFICATION_ATTEMPT",
+                resource_type="Criminal",
+                resource_id=target_id,
+                subject_name=data.name,
+                result="DENIED",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request,
+                details={"reason": "User lacks criminal:update permission"}
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Permission 'criminal:update' is required to modify dossiers."
+            )
+        # Check jurisdictional boundary
+        if not can_access_criminal(current_user, existing, db):
+            log_audit_event(
+                db=db,
+                action="ACCESS_DENIED",
+                resource_type="Criminal",
+                resource_id=target_id,
+                subject_name=data.name,
+                result="DENIED",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request,
+                details={"reason": "Cross-jurisdiction update attempt"}
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Jurisdictional restriction. You cannot update records outside your assigned region."
+            )
+    else:
+        # Creating new profile strictly requires explicit criminal_records.create permission from Super Admin
+        if not has_criminal_create_permission(current_user, db):
+            log_audit_event(
+                db=db,
+                action="UNAUTHORIZED_CREATION_ATTEMPT",
+                resource_type="Criminal",
+                resource_id=target_id,
+                subject_name=data.name,
+                result="DENIED",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request,
+                details={"reason": "User lacks criminal_records.create permission"}
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Explicit 'criminal_records.create' permission from Super Admin is required to create criminal records."
+            )
+
+        # Enforce regional scope when creating a new record
+        if not jurisdiction.is_global:
+            if jurisdiction.role_name == ROLE_REGIONAL_ADMIN and jurisdiction.region:
+                if getattr(data, "state", None) and jurisdiction.state:
+                    if data.state.lower().strip() != jurisdiction.state.lower().strip():
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Cross-Region Violation: Cannot create criminal records outside your authorized state."
+                        )
+
+
     # Duplicate checks when creating new record or changing ID number (ignore placeholder values)
     clean_id_num = (data.identificationNumber or "").strip()
     placeholder_ids = {"XXXX-XXXX-9900", "XXXX-XXXX-0000", "0000-0000-0000", ""}
@@ -240,19 +344,30 @@ def save_criminal(
             except Exception as e:
                 logger.warning("Biometric template auto-indexing failed: %s", e)
 
-        audit = AuditLogModel(
-            user_id=current_user.id,
-            officer_name=current_user.full_name,
-            action="Status Updated",
-            subject_id=target_id,
-            subject_name=data.name,
-            details={"message": f"Updated criminal profile dossier for {data.name}"}
-        )
-        db.add(audit)
-        db.commit()
-        db.refresh(existing)
-        return model_to_schema(existing)
+        try:
+            audit = AuditLogModel(
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                action="Status Updated",
+                subject_id=target_id,
+                subject_name=data.name,
+                details={"message": f"Updated criminal profile dossier for {data.name}"}
+            )
+            db.add(audit)
+            db.commit()
+            db.refresh(existing)
+            return model_to_schema(existing)
+        except Exception as e:
+            db.rollback()
+            logger.error("Failed to commit criminal profile update: %s", e)
+            raise HTTPException(status_code=500, detail=f"Database transaction failed while saving criminal profile: {str(e)}")
     else:
+        # Regional binding for new records: bind to officer's station/district/state/region
+        assigned_ps = jurisdiction.station_id
+        assigned_dist = jurisdiction.district
+        assigned_state = jurisdiction.state or data.state or "New York"
+        assigned_region = jurisdiction.region
+
         new_p = CriminalProfileModel(
             id=target_id,
             name=data.name.strip(),
@@ -265,7 +380,11 @@ def save_criminal(
             identification_number=clean_id_num or f"ID-{uuid.uuid4().hex[:8].upper()}",
             primary_address=data.primaryAddress,
             city=data.city or "Metro City",
-            state=data.state or "NY",
+            district=assigned_dist,
+            state=assigned_state,
+            region=assigned_region,
+            police_station_id=assigned_ps,
+            created_by_id=current_user.id,
             height=data.height or "175 cm",
             weight=data.weight or "75 kg",
             eye_color=data.eyeColor or "Brown",
@@ -316,18 +435,36 @@ def save_criminal(
             except Exception as e:
                 logger.warning("Biometric template auto-indexing failed on creation: %s", e)
 
-        audit = AuditLogModel(
-            user_id=current_user.id,
-            officer_name=current_user.full_name,
-            action="New Record Created",
-            subject_id=target_id,
-            subject_name=data.name,
-            details={"message": f"Created new criminal record profile for {data.name}"}
-        )
-        db.add(audit)
-        db.commit()
-        db.refresh(new_p)
-        return model_to_schema(new_p)
+        try:
+            audit = AuditLogModel(
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                action="New Record Created",
+                subject_id=target_id,
+                subject_name=data.name,
+                details={"message": f"Created new criminal record profile for {data.name}"}
+            )
+            db.add(audit)
+            log_audit_event(
+                db=db,
+                action="CREATE_CRIMINAL",
+                resource_type="Criminal",
+                resource_id=target_id,
+                subject_name=data.name,
+                result="SUCCESS",
+                user_id=current_user.id,
+                officer_name=current_user.full_name,
+                request=request,
+                details={"badge": current_user.badge_number, "region": assigned_region}
+            )
+            db.commit()
+            db.refresh(new_p)
+            return model_to_schema(new_p)
+        except Exception as e:
+            db.rollback()
+            logger.error("Failed to commit new criminal profile: %s", e)
+            raise HTTPException(status_code=500, detail=f"Database transaction failed while creating criminal profile: {str(e)}")
+
 
 @router.put("/{profile_id}/archive")
 def toggle_archive(
@@ -336,11 +473,52 @@ def toggle_archive(
     current_user: UserModel = Depends(require_permission("criminal:archive"))
 ):
     profile = db.query(CriminalProfileModel).filter(CriminalProfileModel.id == profile_id).first()
-    if not profile:
+    if not profile or profile.is_deleted:
         raise HTTPException(status_code=404, detail="Criminal profile not found")
+
+    if not can_access_criminal(current_user, profile, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Jurisdictional restriction. You do not have clearance to archive this record."
+        )
+
     profile.is_archived = not profile.is_archived
     db.commit()
     return {"status": "success", "isArchived": profile.is_archived}
+
+@router.delete("/{profile_id}")
+def delete_criminal(
+    profile_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_permission("criminal:delete"))
+):
+    profile = db.query(CriminalProfileModel).filter(CriminalProfileModel.id == profile_id).first()
+    if not profile or profile.is_deleted:
+        raise HTTPException(status_code=404, detail="Criminal profile not found")
+
+    if not can_access_criminal(current_user, profile, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Jurisdictional restriction. You do not have clearance to delete this record."
+        )
+
+    profile.is_deleted = True
+    profile.deleted_at = datetime.now(timezone.utc)
+
+    log_audit_event(
+        db=db,
+        action="DELETE_CRIMINAL",
+        resource_type="Criminal",
+        resource_id=profile.id,
+        subject_name=profile.name,
+        result="SUCCESS",
+        user_id=current_user.id,
+        officer_name=current_user.full_name,
+        request=request
+    )
+    db.commit()
+    return {"status": "success", "message": f"Dossier {profile_id} deleted successfully"}
 
 # --- PHOTO STORAGE & BIOMETRICS ENDPOINTS ---
 

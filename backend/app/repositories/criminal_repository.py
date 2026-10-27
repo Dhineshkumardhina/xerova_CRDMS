@@ -6,6 +6,8 @@ from app.repositories.base import CRUDBase
 from app.models.criminal import CriminalProfileModel
 from app.models.case import CaseRecordModel, CriminalCaseModel
 from app.models.police_station import PoliceStationModel
+from app.models.user import UserModel
+from app.core.rbac import apply_criminal_scope
 
 class CriminalRepository(CRUDBase[CriminalProfileModel]):
     def __init__(self):
@@ -28,9 +30,14 @@ class CriminalRepository(CRUDBase[CriminalProfileModel]):
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "name",
-        sort_order: str = "asc"
+        sort_order: str = "asc",
+        current_user: Optional[UserModel] = None
     ) -> Tuple[List[CriminalProfileModel], int]:
         base_query = db.query(CriminalProfileModel).filter(CriminalProfileModel.is_deleted == False)
+
+        # Enforce jurisdictional scoping if user is provided
+        if current_user:
+            base_query = apply_criminal_scope(base_query, current_user, db)
 
         # 1. Global Search Query across Name, Alias, Father Name, Phone, ID, Address, Case Number / FIR Number
         if query_str and query_str.strip():
