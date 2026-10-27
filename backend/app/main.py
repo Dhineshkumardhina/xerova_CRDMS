@@ -31,7 +31,7 @@ async def add_security_headers_and_rate_limit(request: Request, call_next):
     # Rate Limiting Enforcement on Sensitive Law Enforcement Endpoints
     try:
         if path == "/api/v1/auth/login" and request.method == "POST":
-            rate_limiter.check_rate_limit(request, endpoint_key="auth_login", max_requests=5, window_seconds=60)
+            rate_limiter.check_rate_limit(request, endpoint_key="auth_login", max_requests=30, window_seconds=60)
         elif (path == "/api/v1/search/photo" or path == "/api/v1/face-search") and request.method == "POST":
             rate_limiter.check_rate_limit(request, endpoint_key="photo_search", max_requests=120, window_seconds=60)
         elif path.startswith("/api/v1/criminals/") and path.endswith("/photos") and request.method == "POST":
@@ -61,14 +61,17 @@ allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
-    "http://localhost:8000"
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

@@ -52,6 +52,28 @@ class MediaItemSchema(BaseModel):
     dateTaken: Optional[str] = None
     dateUploaded: Optional[str] = None
 
+class RelativeDetailSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    relation: str
+    phone: Optional[str] = None
+    aadhaar: Optional[str] = None
+    imei: Optional[str] = None
+    address: Optional[str] = None
+    photoUrl: Optional[str] = None
+    notes: Optional[str] = None
+
+class SocialMediaDetailSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    platform: str
+    handle: str
+    profileUrl: Optional[str] = None
+    notes: Optional[str] = None
+
 class CriminalProfileSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +87,7 @@ class CriminalProfileSchema(BaseModel):
     phone: Optional[str] = ""
     identificationNumber: Optional[str] = ""
     rawIdNumber: Optional[str] = None
+    imei: Optional[str] = None
     primaryAddress: Optional[str] = ""
     city: Optional[str] = ""
     state: Optional[str] = ""
@@ -85,5 +108,7 @@ class CriminalProfileSchema(BaseModel):
     cases: List[CaseRecordSchema] = []
     documents: List[DocumentItemSchema] = []
     media: List[MediaItemSchema] = []
+    relatives: List[RelativeDetailSchema] = []
+    socialMedia: List[SocialMediaDetailSchema] = []
     isArchived: Optional[bool] = False
     notes: Optional[str] = None

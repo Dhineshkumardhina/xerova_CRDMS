@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CriminalProfile, CrimeCategoryType, RiskLevel, RecordStatus } from '../types';
-import { X, Plus, Trash2, Check, Camera, Upload, Image as ImageIcon, Link as LinkIcon, RefreshCw, AlertCircle } from 'lucide-react';
+import { CriminalProfile, CrimeCategoryType, RiskLevel, RecordStatus, RelativeDetail, SocialMediaDetail } from '../types';
+import { X, Plus, Trash2, Check, Camera, Upload, Image as ImageIcon, Link as LinkIcon, RefreshCw, AlertCircle, Users, Share2, Phone, MapPin, Globe, AtSign, CreditCard, Smartphone } from 'lucide-react';
 
 const PRESET_MUGSHOTS = [
   {
@@ -46,8 +46,8 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
     age: 34,
     gender: 'Male',
     phone: '+1 555-000-1122',
-    identificationNumber: `XXXX-XXXX-${Math.floor(1000 + Math.random() * 9000)}`,
-    rawIdNumber: `9900-1122-${Math.floor(1000 + Math.random() * 9000)}`,
+    identificationNumber: 'XXXX-XXXX-9900',
+    rawIdNumber: '9900-1122-3344',
     primaryAddress: '',
     city: 'Metro City',
     state: 'NY',
@@ -68,11 +68,42 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
     cases: [],
     documents: [],
     media: [],
+    relatives: [],
+    socialMedia: [],
   });
 
   const [newMark, setNewMark] = useState('');
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Relatives State
+  const [relName, setRelName] = useState('');
+  const [relRelation, setRelRelation] = useState('Father');
+  const [relPhone, setRelPhone] = useState('');
+  const [relAadhaar, setRelAadhaar] = useState('');
+  const [relImei, setRelImei] = useState('');
+  const [relAddress, setRelAddress] = useState('');
+  const [relPhotoUrl, setRelPhotoUrl] = useState('');
+  const relFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRelPhotoChange = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file (JPEG, PNG, WEBP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setRelPhotoUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Social Media State
+  const [smPlatform, setSmPlatform] = useState('Instagram');
+  const [smHandle, setSmHandle] = useState('');
+  const [smUrl, setSmUrl] = useState('');
 
   const handlePhotoFileChange = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -102,9 +133,12 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
 
   useEffect(() => {
     if (editingProfile) {
-      setFormData(editingProfile);
+      setFormData({
+        ...editingProfile,
+        relatives: editingProfile.relatives || [],
+        socialMedia: editingProfile.socialMedia || [],
+      });
     } else {
-      const randSuffix = Math.floor(1000 + Math.random() * 9000);
       setFormData({
         id: `CR-${Math.floor(100000 + Math.random() * 900000)}`,
         name: '',
@@ -114,8 +148,8 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
         age: 34,
         gender: 'Male',
         phone: '+1 555-000-1122',
-        identificationNumber: `XXXX-XXXX-${randSuffix}`,
-        rawIdNumber: `9900-1122-${randSuffix}`,
+        identificationNumber: 'XXXX-XXXX-9900',
+        rawIdNumber: '9900-1122-3344',
         primaryAddress: '',
         city: 'Metro City',
         state: 'NY',
@@ -147,6 +181,8 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
         ],
         documents: [],
         media: [],
+        relatives: [],
+        socialMedia: [],
       });
     }
   }, [editingProfile, isOpen]);
@@ -174,6 +210,64 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
     }));
   };
 
+  const handleAddRelative = () => {
+    if (!relName.trim()) return;
+    const newRelative: RelativeDetail = {
+      id: `rel-${Date.now()}`,
+      name: relName.trim(),
+      relation: relRelation,
+      phone: relPhone.trim() || undefined,
+      aadhaar: relAadhaar.trim() || undefined,
+      imei: relImei.trim() || undefined,
+      address: relAddress.trim() || undefined,
+      photoUrl: relPhotoUrl || undefined,
+    };
+    setFormData((prev) => ({
+      ...prev,
+      relatives: [...(prev.relatives || []), newRelative],
+    }));
+    setRelName('');
+    setRelPhone('');
+    setRelAadhaar('');
+    setRelImei('');
+    setRelAddress('');
+    setRelPhotoUrl('');
+  };
+
+  const handleRemoveRelative = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      relatives: (prev.relatives || []).filter((r) => r.id !== id),
+    }));
+  };
+
+  const handleAddSocialMedia = () => {
+    if (!smHandle.trim()) return;
+    let handle = smHandle.trim();
+    if (!handle.startsWith('@') && !handle.startsWith('http') && smPlatform !== 'Other') {
+      handle = `@${handle}`;
+    }
+    const newSocial: SocialMediaDetail = {
+      id: `sm-${Date.now()}`,
+      platform: smPlatform,
+      handle,
+      profileUrl: smUrl.trim() || undefined,
+    };
+    setFormData((prev) => ({
+      ...prev,
+      socialMedia: [...(prev.socialMedia || []), newSocial],
+    }));
+    setSmHandle('');
+    setSmUrl('');
+  };
+
+  const handleRemoveSocialMedia = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      socialMedia: (prev.socialMedia || []).filter((s) => s.id !== id),
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim()) {
@@ -191,6 +285,7 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
       phone: formData.phone || 'Unlisted',
       identificationNumber: formData.identificationNumber || 'XXXX-XXXX-0000',
       rawIdNumber: formData.rawIdNumber || '0000-0000-0000',
+      imei: formData.imei?.trim() || undefined,
       primaryAddress: formData.primaryAddress || 'Unregistered Address',
       city: formData.city || 'Metro City',
       state: formData.state || 'NY',
@@ -213,6 +308,8 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
       cases: formData.cases || [],
       documents: formData.documents || [],
       media: formData.media || [],
+      relatives: formData.relatives || [],
+      socialMedia: formData.socialMedia || [],
       isHistorical: formData.isHistorical || false,
     };
 
@@ -627,6 +724,67 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
+                  Contact Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={formData.phone || ''}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full h-10 pl-9 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 font-mono text-[13px] transition-all shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
+                  Aadhaar Card No (UIDAI) / National ID
+                </label>
+                <div className="relative">
+                  <CreditCard className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={formData.rawIdNumber || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const clean = val.replace(/\s+/g, '');
+                      const masked = clean.length >= 4 
+                        ? `XXXX-XXXX-${clean.slice(-4)}`
+                        : val ? `XXXX-XXXX-XXXX` : '';
+                      setFormData({
+                        ...formData,
+                        rawIdNumber: val,
+                        identificationNumber: masked || val,
+                      });
+                    }}
+                    placeholder="e.g. 5432 1098 7654"
+                    maxLength={19}
+                    className="w-full h-10 pl-9 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 font-mono text-[13px] tracking-wider transition-all shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
+                  Device IMEI Number (Forensics)
+                </label>
+                <div className="relative">
+                  <Smartphone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={formData.imei || ''}
+                    onChange={(e) => setFormData({ ...formData, imei: e.target.value })}
+                    placeholder="15-digit IMEI (e.g. 865432041234567)"
+                    maxLength={18}
+                    className="w-full h-10 pl-9 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 font-mono text-[13px] tracking-wider transition-all shadow-xs"
+                  />
+                </div>
+              </div>
+
               <div className="sm:col-span-2">
                 <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
                   Primary Address
@@ -702,6 +860,394 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Relative Details & Next of Kin */}
+          <div className="border-t border-[#E5E7EB] pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-slate-700" />
+                <h4 className="text-[12px] font-bold text-neutral-800 uppercase tracking-wider">
+                  Relative Details &amp; Known Next of Kin
+                </h4>
+              </div>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-[#E5E7EB]">
+                {(formData.relatives || []).length} Recorded
+              </span>
+            </div>
+
+            {/* Hidden Relative Photo Input */}
+            <input
+              type="file"
+              ref={relFileInputRef}
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && handleRelPhotoChange(e.target.files[0])}
+              className="hidden"
+            />
+
+            {/* Relative Input Fields */}
+            <div className="bg-[#F8F9FA] p-3.5 rounded-xl border border-[#E5E7EB] mb-3 space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Relative / Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    value={relName}
+                    onChange={(e) => setRelName(e.target.value)}
+                    placeholder="Full legal name"
+                    className="w-full h-9 px-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Relationship
+                  </label>
+                  <select
+                    value={relRelation}
+                    onChange={(e) => setRelRelation(e.target.value)}
+                    className="w-full h-9 px-2 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs cursor-pointer"
+                  >
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Spouse">Spouse / Partner</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Child">Child / Dependent</option>
+                    <option value="Guardian">Legal Guardian</option>
+                    <option value="Associate">Known Associate</option>
+                    <option value="Other">Other Relative</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Contact Phone No
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={relPhone}
+                      onChange={(e) => setRelPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full h-9 pl-8 pr-2 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] font-mono shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Aadhaar Card No
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={relAadhaar}
+                      onChange={(e) => setRelAadhaar(e.target.value)}
+                      placeholder="12-digit Aadhaar"
+                      maxLength={19}
+                      className="w-full h-9 pl-8 pr-2 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] font-mono shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Handset IMEI No
+                  </label>
+                  <div className="relative">
+                    <Smartphone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={relImei}
+                      onChange={(e) => setRelImei(e.target.value)}
+                      placeholder="15-digit IMEI"
+                      maxLength={18}
+                      className="w-full h-9 pl-8 pr-2.5 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] font-mono shadow-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <MapPin className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={relAddress}
+                    onChange={(e) => setRelAddress(e.target.value)}
+                    placeholder="Residential address / Current location (optional)"
+                    className="w-full h-9 pl-8 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs"
+                  />
+                </div>
+
+                {/* Relative Photo Uploader */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {relPhotoUrl ? (
+                    <div className="relative group">
+                      <img
+                        src={relPhotoUrl}
+                        alt="Relative preview"
+                        className="w-9 h-9 rounded-lg object-cover border border-[#E5E7EB] shadow-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRelPhotoUrl('')}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] hover:bg-rose-700 cursor-pointer shadow-xs"
+                        title="Remove photo"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => relFileInputRef.current?.click()}
+                      className="h-9 px-3 bg-white hover:bg-neutral-100 text-neutral-700 border border-[#E5E7EB] text-[12px] font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                      title="Upload relative photo"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-[#3B5B7A]" />
+                      <span>Attach Photo</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleAddRelative}
+                    className="h-9 px-4 bg-neutral-900 hover:bg-black text-white text-[12px] font-semibold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                  >
+                    <Plus className="w-4 h-4" /> Add Relative
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Added Relatives */}
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(formData.relatives || []).length === 0 ? (
+                <div className="text-[12px] text-neutral-500 italic py-1">
+                  No relatives or emergency contacts recorded yet.
+                </div>
+              ) : (
+                formData.relatives?.map((rel) => (
+                  <div
+                    key={rel.id}
+                    className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg border border-[#E5E7EB] hover:bg-neutral-100/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {rel.photoUrl ? (
+                        <img
+                          src={rel.photoUrl}
+                          alt={rel.name}
+                          className="w-8 h-8 rounded-full object-cover border border-[#E5E7EB] shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-700 font-bold text-[11px] shrink-0">
+                          {rel.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 shrink-0">
+                        {rel.relation}
+                      </span>
+                      <span className="text-[13px] font-bold text-neutral-900 truncate">
+                        {rel.name}
+                      </span>
+                      {rel.phone && (
+                        <span className="text-[12px] font-mono text-neutral-600 flex items-center gap-1 shrink-0">
+                          <Phone className="w-3 h-3 text-neutral-400" />
+                          {rel.phone}
+                        </span>
+                      )}
+                      {rel.aadhaar && (
+                        <span className="text-[11px] font-mono text-slate-700 flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 shrink-0">
+                          <CreditCard className="w-3 h-3 text-slate-500" />
+                          Aadhaar: {rel.aadhaar}
+                        </span>
+                      )}
+                      {rel.imei && (
+                        <span className="text-[11px] font-mono text-purple-700 flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 shrink-0">
+                          <Smartphone className="w-3 h-3 text-purple-500" />
+                          IMEI: {rel.imei}
+                        </span>
+                      )}
+                      {rel.address && (
+                        <span className="text-[11px] text-neutral-500 truncate hidden md:inline">
+                          • {rel.address}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRelative(rel.id)}
+                      className="text-neutral-400 hover:text-red-600 p-1 cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove Relative"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Social Media Details */}
+          <div className="border-t border-[#E5E7EB] pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-slate-700" />
+                <h4 className="text-[12px] font-bold text-neutral-800 uppercase tracking-wider">
+                  Social Media &amp; Digital Handles
+                </h4>
+              </div>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-[#E5E7EB]">
+                {(formData.socialMedia || []).length} Handles
+              </span>
+            </div>
+
+            {/* Social Media Input Fields */}
+            <div className="bg-[#F8F9FA] p-3.5 rounded-xl border border-[#E5E7EB] mb-3 space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Platform
+                  </label>
+                  <select
+                    value={smPlatform}
+                    onChange={(e) => setSmPlatform(e.target.value)}
+                    className="w-full h-9 px-2.5 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs cursor-pointer"
+                  >
+                    <optgroup label="Popular Social Networks">
+                      <option value="Instagram">Instagram</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="X (Twitter)">X (Twitter)</option>
+                      <option value="Threads">Threads</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="Snapchat">Snapchat</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Reddit">Reddit</option>
+                      <option value="Pinterest">Pinterest</option>
+                      <option value="Tumblr">Tumblr</option>
+                    </optgroup>
+                    <optgroup label="Instant & Encrypted Messaging">
+                      <option value="WhatsApp">WhatsApp</option>
+                      <option value="Telegram">Telegram</option>
+                      <option value="Signal">Signal</option>
+                      <option value="Discord">Discord</option>
+                      <option value="WeChat">WeChat</option>
+                      <option value="Viber">Viber</option>
+                      <option value="LINE">LINE</option>
+                      <option value="Session">Session</option>
+                      <option value="Wickr">Wickr</option>
+                      <option value="Skype">Skype</option>
+                    </optgroup>
+                    <optgroup label="Video, Live & Streaming">
+                      <option value="YouTube">YouTube</option>
+                      <option value="Twitch">Twitch</option>
+                      <option value="Kick">Kick</option>
+                      <option value="Rumble">Rumble</option>
+                    </optgroup>
+                    <optgroup label="Alternative, Regional & Other">
+                      <option value="VK (VKontakte)">VK (VKontakte)</option>
+                      <option value="Bluesky">Bluesky</option>
+                      <option value="Mastodon">Mastodon</option>
+                      <option value="Truth Social">Truth Social</option>
+                      <option value="GitHub">GitHub</option>
+                      <option value="OnlyFans">OnlyFans</option>
+                      <option value="Other">Other Platform</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Username / Handle
+                  </label>
+                  <div className="relative">
+                    <AtSign className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={smHandle}
+                      onChange={(e) => setSmHandle(e.target.value)}
+                      placeholder="@handle or username"
+                      className="w-full h-9 pl-8 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    Profile URL (Optional)
+                  </label>
+                  <div className="relative">
+                    <Globe className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={smUrl}
+                      onChange={(e) => setSmUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full h-9 pl-8 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] shadow-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddSocialMedia}
+                  className="h-9 px-4 bg-neutral-900 hover:bg-black text-white text-[12px] font-semibold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Social Handle
+                </button>
+              </div>
+            </div>
+
+            {/* List of Added Social Media Accounts */}
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(formData.socialMedia || []).length === 0 ? (
+                <div className="text-[12px] text-neutral-500 italic py-1">
+                  No social media accounts or digital handles recorded.
+                </div>
+              ) : (
+                formData.socialMedia?.map((sm) => (
+                  <div
+                    key={sm.id}
+                    className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg border border-[#E5E7EB] hover:bg-neutral-100/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                        {sm.platform}
+                      </span>
+                      <span className="font-mono text-[13px] font-bold text-neutral-900 truncate">
+                        {sm.handle}
+                      </span>
+                      {sm.profileUrl && (
+                        <a
+                          href={sm.profileUrl.startsWith('http') ? sm.profileUrl : `https://${sm.profileUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] text-[#3B5B7A] hover:underline flex items-center gap-1 shrink-0"
+                        >
+                          <LinkIcon className="w-3 h-3" />
+                          Link
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSocialMedia(sm.id)}
+                      className="text-neutral-400 hover:text-red-600 p-1 cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove Social Media"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

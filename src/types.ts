@@ -37,6 +37,26 @@ export interface IdentificationMark {
   detail?: string;
 }
 
+export interface RelativeDetail {
+  id: string;
+  name: string;
+  relation: string; // e.g. Father, Mother, Spouse, Sibling, Child, Guardian, Relative, Other
+  phone?: string;
+  aadhaar?: string;
+  imei?: string;
+  address?: string;
+  photoUrl?: string;
+  notes?: string;
+}
+
+export interface SocialMediaDetail {
+  id: string;
+  platform: string; // e.g. Instagram, Facebook, X (Twitter), Telegram, WhatsApp, TikTok, YouTube, Other
+  handle: string; // e.g. @username
+  profileUrl?: string;
+  notes?: string;
+}
+
 export interface CaseRecord {
   id: string;
   caseNumber: string;
@@ -87,6 +107,7 @@ export interface CriminalProfile {
   phone: string;
   identificationNumber: string; // e.g. "XXXX-XXXX-1234"
   rawIdNumber?: string;
+  imei?: string;
   primaryAddress: string;
   city: string;
   state: string;
@@ -107,6 +128,8 @@ export interface CriminalProfile {
   cases: CaseRecord[];
   documents: DocumentItem[];
   media: MediaItem[];
+  relatives?: RelativeDetail[];
+  socialMedia?: SocialMediaDetail[];
   isArchived?: boolean;
   notes?: string;
 }

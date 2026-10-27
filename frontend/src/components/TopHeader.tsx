@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Officer, CriminalProfile } from '../types';
-import { Search, Bell, User, LogOut, Wifi, WifiOff, X } from 'lucide-react';
+import { Search, Bell, User, LogOut, X } from 'lucide-react';
 
 interface TopHeaderProps {
   searchQuery: string;
@@ -123,20 +123,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Trailing Controls & User Info */}
       <div className="flex items-center gap-3 text-neutral-600">
-        {/* Offline Simulator Pill */}
-        <button
-          onClick={onToggleOffline}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer shadow-xs ${
-            isOffline
-              ? 'bg-red-50 text-red-700 border-red-200'
-              : 'bg-[#F8F9FA] text-neutral-700 border-[#E5E7EB] hover:border-neutral-400'
-          }`}
-          title="Toggle network simulation"
-        >
-          {isOffline ? <WifiOff className="w-3.5 h-3.5 text-red-600" /> : <Wifi className="w-3.5 h-3.5 text-emerald-600" />}
-          <span className="hidden sm:inline">{isOffline ? 'Offline Mode' : 'Online'}</span>
-        </button>
-
         {/* Notifications */}
         <div className="relative">
           <button

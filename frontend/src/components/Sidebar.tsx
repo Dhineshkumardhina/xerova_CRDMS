@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActiveTab, Officer } from '../types';
-import { Plus, Wifi, WifiOff } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: ActiveTab;
@@ -122,29 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer Nav */}
       <div className="px-3 flex flex-col gap-1.5 mt-auto pt-3 border-t border-[#E5E5E5]">
-        {/* Offline Simulator Switch */}
-        <button
-          onClick={onToggleOffline}
-          className={`flex items-center justify-between px-3 py-2 rounded-[8px] text-[11px] font-semibold border transition-colors cursor-pointer ${
-            isOffline
-              ? 'bg-red-50 text-red-700 border-red-200'
-              : 'bg-white text-[#525252] border-[#E5E5E5] hover:bg-neutral-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
-          }`}
-          title="Toggle simulated network drop to test offline UX"
-        >
-          <div className="flex items-center gap-2">
-            {isOffline ? (
-              <WifiOff className="w-3.5 h-3.5 text-red-600" />
-            ) : (
-              <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-            )}
-            <span>{isOffline ? 'Offline Mode' : 'System Online'}</span>
-          </div>
-          <span className="text-[10px] underline underline-offset-2 opacity-80 hover:opacity-100">
-            {isOffline ? 'Reconnect' : 'Simulate Drop'}
-          </span>
-        </button>
-
         <button
           onClick={() => onSelectTab('support')}
           className="flex items-center gap-3 px-3 py-2 rounded-[8px] text-[#525252] hover:bg-neutral-200/60 hover:text-[#171717] transition-all text-[12px] font-medium text-left cursor-pointer"

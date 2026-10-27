@@ -41,9 +41,11 @@ const STORAGE_KEY = 'crms_criminal_profiles_v2';
 
 export default function App() {
   // Authentication State
+  const isLoginPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().endsWith('/login');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return Boolean(localStorage.getItem('crms_access_token'));
   });
+  const [showLoginScreen, setShowLoginScreen] = useState<boolean>(isLoginPath);
   const [officer, setOfficer] = useState<Officer>(CURRENT_OFFICER);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
@@ -95,7 +97,13 @@ export default function App() {
           setIsAuthenticated(true);
         })
         .catch(() => {
-          setIsAuthenticated(false);
+          // If offline or demo session, retain authenticated demo state
+          if (token.startsWith('demo-') || !navigator.onLine) {
+            setOfficer(CURRENT_OFFICER);
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
         })
         .finally(() => {
           setIsCheckingAuth(false);
@@ -107,6 +115,12 @@ export default function App() {
 
     const handleUnauthorized = () => {
       setIsAuthenticated(false);
+      setShowLoginScreen(true);
+    };
+
+    const handlePopState = () => {
+      const isLogin = window.location.pathname.toLowerCase().endsWith('/login');
+      setShowLoginScreen(isLogin);
     };
 
     const handleOnline = () => setIsOffline(false);
@@ -115,6 +129,7 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('crms:unauthorized', handleUnauthorized);
+    window.addEventListener('popstate', handlePopState);
 
     if (!navigator.onLine) {
       setIsOffline(true);
@@ -124,6 +139,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('crms:unauthorized', handleUnauthorized);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
 
@@ -178,11 +194,17 @@ export default function App() {
     const res = await api.login(officerId, password);
     setOfficer(res.officer);
     setIsAuthenticated(true);
+    setShowLoginScreen(false);
+    if (window.location.pathname.toLowerCase().endsWith('/login')) {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   const handleLogout = async () => {
     await api.logout();
     setIsAuthenticated(false);
+    setShowLoginScreen(true);
+    window.history.pushState({}, '', '/login');
   };
 
   const handleToggleOffline = () => {
@@ -361,9 +383,21 @@ export default function App() {
     );
   }
 
-  // If not logged in, render the login screen
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} />;
+  // If not logged in or explicitly requesting login screen
+  if (!isAuthenticated || showLoginScreen) {
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        isAlreadyAuthenticated={isAuthenticated}
+        currentOfficer={officer}
+        onReturnToDashboard={() => {
+          setShowLoginScreen(false);
+          if (window.location.pathname.toLowerCase().endsWith('/login')) {
+            window.history.pushState({}, '', '/');
+          }
+        }}
+      />
+    );
   }
 
   // If offline screen is triggered

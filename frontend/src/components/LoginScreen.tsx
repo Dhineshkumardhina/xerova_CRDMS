@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldAlert, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, ShieldAlert, KeyRound, ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Officer } from '../types';
 
 interface LoginScreenProps {
   onLogin: (officerId: string, password?: string) => Promise<void> | void;
+  isAlreadyAuthenticated?: boolean;
+  currentOfficer?: Officer;
+  onReturnToDashboard?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLogin,
+  isAlreadyAuthenticated = false,
+  currentOfficer,
+  onReturnToDashboard,
+}) => {
   const [officerId, setOfficerId] = useState('8829-JD');
   const [password, setPassword] = useState('DeptJusticeSecure#2024');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberSession, setRememberSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isServerOffline, setIsServerOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,10 +31,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     }
     setIsLoading(true);
     setErrorMessage('');
+    setIsServerOffline(false);
     try {
       await onLogin(officerId.trim(), password);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Authentication failed. Please check credentials.');
+      const msg = err.message || 'Authentication failed. Please check credentials.';
+      setErrorMessage(msg);
+      if (
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.includes('connection')
+      ) {
+        setIsServerOffline(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -33,6 +52,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const handleDemoFill = () => {
     setOfficerId('8829-JD');
     setPassword('DeptJusticeSecure#2024');
+    setErrorMessage('');
+    setIsServerOffline(false);
+  };
+
+  const handleInstantDemoLogin = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await onLogin('8829-JD', 'DeptJusticeSecure#2024');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Demo authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,6 +134,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <p className="text-[12px] text-neutral-500 uppercase tracking-wider mt-1 font-mono">Justice Ledger Portal</p>
           </div>
 
+          {/* Active Session Notice if already logged in */}
+          {isAlreadyAuthenticated && onReturnToDashboard && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col gap-2.5">
+              <div className="flex items-center gap-2 text-emerald-800 text-[13px] font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Active Session Detected</span>
+              </div>
+              <p className="text-[12px] text-emerald-700">
+                You are currently signed in as{' '}
+                <strong>{currentOfficer?.name || 'Officer Daniels'}</strong> (Badge #{currentOfficer?.badgeNumber || '8829'}).
+              </p>
+              <button
+                type="button"
+                onClick={onReturnToDashboard}
+                className="mt-1 w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[12px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Return to Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <div className="mb-6">
             <h2 className="text-[22px] leading-[30px] font-bold text-neutral-900 mb-1">
               Authentication Required
@@ -111,19 +166,54 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </div>
 
           {/* Security Note Banner */}
-          <div className="flex items-start gap-3 p-3.5 mb-6 bg-neutral-50 border border-[#E5E7EB] rounded-xl">
+          <div className="flex items-start gap-3 p-3.5 mb-5 bg-neutral-50 border border-[#E5E7EB] rounded-xl">
             <span className="material-symbols-outlined text-slate-800 text-[20px] shrink-0 mt-0.5">
               shield
             </span>
-            <p className="text-[12px] leading-[17px] text-neutral-700">
-              <strong className="text-neutral-900 font-semibold">Authorized Personnel Only.</strong> All access is logged and audited under federal CJIS guidelines.
-            </p>
+            <div className="text-[12px] leading-[17px] text-neutral-700">
+              <strong className="text-neutral-900 font-semibold">Authorized Personnel Only.</strong> All access is logged and audited under CJIS guidelines.
+            </div>
+          </div>
+
+          {/* Demo Credentials Quick Info Box */}
+          <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-[12px]">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-slate-600 shrink-0" />
+              <div>
+                <span className="font-semibold text-slate-900">Demo Badge:</span>{' '}
+                <code className="bg-slate-200/80 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-800">8829-JD</code>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDemoFill}
+              className="text-[11px] font-bold text-slate-700 hover:text-slate-900 underline underline-offset-2 cursor-pointer"
+            >
+              Autofill
+            </button>
           </div>
 
           {errorMessage && (
-            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[12px] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[12px] flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span className="font-medium">{errorMessage}</span>
+              </div>
+              {isServerOffline && (
+                <div className="pt-2 border-t border-rose-200/80 flex flex-col gap-1.5">
+                  <p className="text-[11px] text-rose-600">
+                    The backend API server (port 8000) is unreachable. You can continue instantly in offline / demo mode.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleInstantDemoLogin}
+                    className="w-full py-1.5 px-3 bg-slate-900 hover:bg-black text-white text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Proceed in Demo Mode</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -202,8 +292,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               </button>
             </div>
 
-            {/* Action */}
-            <div className="pt-3">
+            {/* Primary Action Button */}
+            <div className="pt-2 flex flex-col gap-2.5">
               <button
                 type="submit"
                 disabled={isLoading}
@@ -220,6 +310,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <span className="material-symbols-outlined text-[18px]">login</span>
                   </span>
                 )}
+              </button>
+
+              {/* Instant One-Click Demo Mode Button */}
+              <button
+                type="button"
+                onClick={handleInstantDemoLogin}
+                disabled={isLoading}
+                className="w-full h-10 flex justify-center items-center bg-slate-100 hover:bg-slate-200 text-slate-800 text-[12px] font-semibold rounded-xl border border-slate-200 transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 mr-1.5 text-slate-600" />
+                Quick Launch (Demo Mode)
               </button>
             </div>
           </form>
