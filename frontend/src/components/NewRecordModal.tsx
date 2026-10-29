@@ -2,6 +2,65 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CriminalProfile, CrimeCategoryType, RiskLevel, RecordStatus, RelativeDetail, SocialMediaDetail } from '../types';
 import { X, Plus, Trash2, Check, Camera, Upload, Image as ImageIcon, Link as LinkIcon, RefreshCw, AlertCircle, Users, Share2, Phone, MapPin, Globe, AtSign, CreditCard, Smartphone } from 'lucide-react';
 
+const INDIAN_STATES = [
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chhattisgarh',
+  'Delhi',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
+  'Jammu and Kashmir',
+  'Ladakh',
+  'Puducherry',
+  'Chandigarh',
+];
+
+const formatIndianPhone = (raw: string): string => {
+  const digitsOnly = raw.replace(/\D/g, '');
+  if (!digitsOnly) return '+91 ';
+  let phoneNum = digitsOnly;
+  if (phoneNum.startsWith('91')) {
+    phoneNum = phoneNum.slice(2);
+  }
+  phoneNum = phoneNum.slice(0, 10);
+  if (phoneNum.length > 5) {
+    return `+91 ${phoneNum.slice(0, 5)} ${phoneNum.slice(5)}`;
+  }
+  return `+91 ${phoneNum}`;
+};
+
+const formatAadhaar = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '').slice(0, 12);
+  const parts: string[] = [];
+  for (let i = 0; i < digits.length; i += 4) {
+    parts.push(digits.slice(i, i + 4));
+  }
+  return parts.join(' ');
+};
+
 const PRESET_MUGSHOTS = [
   {
     id: 'preset-1',
@@ -45,12 +104,12 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
     dob: '1990-01-01',
     age: 34,
     gender: 'Male',
-    phone: '+1 555-000-1122',
-    identificationNumber: 'XXXX-XXXX-9900',
-    rawIdNumber: '9900-1122-3344',
+    phone: '+91 98765 43210',
+    identificationNumber: 'XXXX-XXXX-9012',
+    rawIdNumber: '5432 1098 9012',
     primaryAddress: '',
-    city: 'Metro City',
-    state: 'NY',
+    city: 'New Delhi',
+    state: 'Delhi',
     height: '178 cm',
     weight: '75 kg',
     eyeColor: 'Brown',
@@ -147,12 +206,12 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
         dob: '1990-01-01',
         age: 34,
         gender: 'Male',
-        phone: '+1 555-000-1122',
-        identificationNumber: 'XXXX-XXXX-9900',
-        rawIdNumber: '9900-1122-3344',
+        phone: '+91 98765 43210',
+        identificationNumber: 'XXXX-XXXX-9012',
+        rawIdNumber: '5432 1098 9012',
         primaryAddress: '',
-        city: 'Metro City',
-        state: 'NY',
+        city: 'New Delhi',
+        state: 'Delhi',
         height: '178 cm',
         weight: '75 kg',
         eyeColor: 'Brown',
@@ -282,13 +341,13 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
       dob: formData.dob || '1990-01-01',
       age: Number(formData.age) || 30,
       gender: (formData.gender as any) || 'Male',
-      phone: formData.phone || 'Unlisted',
+      phone: formData.phone || '+91 98765 43210',
       identificationNumber: formData.identificationNumber || 'XXXX-XXXX-0000',
       rawIdNumber: formData.rawIdNumber || '0000-0000-0000',
       imei: formData.imei?.trim() || undefined,
       primaryAddress: formData.primaryAddress || 'Unregistered Address',
-      city: formData.city || 'Metro City',
-      state: formData.state || 'NY',
+      city: formData.city || 'New Delhi',
+      state: formData.state || 'Delhi',
       height: formData.height || '175 cm',
       weight: formData.weight || '75 kg',
       eyeColor: formData.eyeColor || 'Brown',
@@ -726,15 +785,16 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
 
               <div>
                 <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
-                  Contact Phone Number
+                  Contact Phone Number (Indian Std +91)
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
-                    type="text"
+                    type="tel"
                     value={formData.phone || ''}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, phone: formatIndianPhone(e.target.value) })}
                     placeholder="+91 98765 43210"
+                    maxLength={16}
                     className="w-full h-10 pl-9 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 font-mono text-[13px] transition-all shadow-xs"
                   />
                 </div>
@@ -742,7 +802,7 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
 
               <div>
                 <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
-                  Aadhaar Card No (UIDAI) / National ID
+                  Aadhaar Card No (UIDAI 12-Digit)
                 </label>
                 <div className="relative">
                   <CreditCard className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -751,18 +811,19 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
                     value={formData.rawIdNumber || ''}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const clean = val.replace(/\s+/g, '');
+                      const formatted = formatAadhaar(val);
+                      const clean = formatted.replace(/\s+/g, '');
                       const masked = clean.length >= 4 
                         ? `XXXX-XXXX-${clean.slice(-4)}`
-                        : val ? `XXXX-XXXX-XXXX` : '';
+                        : clean ? `XXXX-XXXX-XXXX` : '';
                       setFormData({
                         ...formData,
-                        rawIdNumber: val,
-                        identificationNumber: masked || val,
+                        rawIdNumber: formatted,
+                        identificationNumber: masked || formatted,
                       });
                     }}
                     placeholder="e.g. 5432 1098 7654"
-                    maxLength={19}
+                    maxLength={14}
                     className="w-full h-10 pl-9 pr-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 font-mono text-[13px] tracking-wider transition-all shadow-xs"
                   />
                 </div>
@@ -800,23 +861,27 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
 
               <div>
                 <label className="block text-[12px] font-semibold text-neutral-900 mb-1">
-                  City &amp; State
+                  City &amp; State (India)
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.city || ''}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="City"
-                    className="w-2/3 h-10 px-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 transition-all shadow-xs"
+                    placeholder="City (e.g. New Delhi)"
+                    className="w-1/2 h-10 px-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] transition-all shadow-xs"
                   />
-                  <input
-                    type="text"
-                    value={formData.state || ''}
+                  <select
+                    value={formData.state || 'Delhi'}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    placeholder="State"
-                    className="w-1/3 h-10 px-3 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none font-mono bg-white text-neutral-900 transition-all shadow-xs"
-                  />
+                    className="w-1/2 h-10 px-2.5 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[12.5px] font-medium transition-all shadow-xs cursor-pointer"
+                  >
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -931,7 +996,7 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
                     <input
                       type="text"
                       value={relPhone}
-                      onChange={(e) => setRelPhone(e.target.value)}
+                      onChange={(e) => setRelPhone(formatIndianPhone(e.target.value))}
                       placeholder="+91 98765 43210"
                       className="w-full h-9 pl-8 pr-2 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] font-mono shadow-xs"
                     />
@@ -947,7 +1012,7 @@ export const NewRecordModal: React.FC<NewRecordModalProps> = ({
                     <input
                       type="text"
                       value={relAadhaar}
-                      onChange={(e) => setRelAadhaar(e.target.value)}
+                      onChange={(e) => setRelAadhaar(formatAadhaar(e.target.value))}
                       placeholder="12-digit Aadhaar"
                       maxLength={19}
                       className="w-full h-9 pl-8 pr-2 border border-[#E5E7EB] rounded-lg focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none bg-white text-neutral-900 text-[13px] font-mono shadow-xs"

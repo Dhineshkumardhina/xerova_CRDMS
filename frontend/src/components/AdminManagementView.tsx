@@ -37,6 +37,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({ curren
     currentOfficer.isSuperuser ||
     currentOfficer.role === 'Super Administrator' ||
     currentOfficer.role === 'Super Admin' ||
+    currentOfficer.role === 'Administrator' ||
     currentOfficer.badgeNumber === '8829-JD'
   );
 

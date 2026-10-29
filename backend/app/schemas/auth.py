@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from app.schemas.user import UserOfficerSchema
 
 class LoginRequest(BaseModel):
     officerId: Optional[str] = None
@@ -13,18 +14,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    officer: "OfficerSchema"
+    officer: UserOfficerSchema
 
-class OfficerSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    badgeNumber: str
-    name: str
-    rank: str
-    department: str
-    clearanceLevel: str
-    avatarUrl: str
-    status: str
-
-Token.model_rebuild()
+class OfficerSchema(UserOfficerSchema):
+    pass

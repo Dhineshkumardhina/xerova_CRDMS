@@ -23,6 +23,7 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
     officer.isSuperuser ||
     officer.role === 'Super Administrator' ||
     officer.role === 'Super Admin' ||
+    officer.role === 'Administrator' ||
     officer.badgeNumber === '8829-JD'
   );
 

@@ -25,7 +25,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     officer.isSuperuser ||
     officer.role === 'Super Administrator' ||
     officer.role === 'Super Admin' ||
+    officer.role === 'Administrator' ||
     officer.badgeNumber === '8829-JD'
+  );
+
+  const canAddCriminal = Boolean(
+    isSuperAdmin ||
+    officer.canCreateCriminals ||
+    officer.role?.toLowerCase().includes('admin')
   );
 
   const navItems: Array<{ id: ActiveTab; label: string; icon: string }> = [
@@ -80,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {officer.canCreateCriminals && (
+        {canAddCriminal && (
           <button
             onClick={onOpenNewRecord}
             className="mt-3 w-full bg-[#171717] text-white hover:bg-black text-[12px] font-semibold py-2.5 px-3 rounded-[8px] flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer shadow-xs"

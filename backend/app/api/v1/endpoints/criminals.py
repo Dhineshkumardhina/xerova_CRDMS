@@ -78,11 +78,11 @@ def model_to_schema(p: CriminalProfileModel) -> CriminalProfileSchema:
         dob=str(p.dob) if p.dob else "1990-01-01",
         age=p.age or 34,
         gender=p.gender or "Male",
-        phone=p.phone_number or "+1 555-000-1122",
+        phone=p.phone_number or "+91 98765 43210",
         identificationNumber=p.identification_number or "XXXX-XXXX-9900",
-        primaryAddress=p.primary_address or "Metro District",
-        city=p.city or "Metro City",
-        state=p.state or "NY",
+        primaryAddress=p.primary_address or "Connaught Place, Central District",
+        city=p.city or "New Delhi",
+        state=p.state or "Delhi",
         height=p.height or "178 cm",
         weight=p.weight or "75 kg",
         eyeColor=p.eye_color or "Brown",
@@ -365,7 +365,7 @@ def save_criminal(
         # Regional binding for new records: bind to officer's station/district/state/region
         assigned_ps = jurisdiction.station_id
         assigned_dist = jurisdiction.district
-        assigned_state = jurisdiction.state or data.state or "New York"
+        assigned_state = jurisdiction.state or data.state or "Delhi"
         assigned_region = jurisdiction.region
 
         new_p = CriminalProfileModel(
@@ -379,7 +379,7 @@ def save_criminal(
             phone_number=data.phone,
             identification_number=clean_id_num or f"ID-{uuid.uuid4().hex[:8].upper()}",
             primary_address=data.primaryAddress,
-            city=data.city or "Metro City",
+            city=data.city or "New Delhi",
             district=assigned_dist,
             state=assigned_state,
             region=assigned_region,

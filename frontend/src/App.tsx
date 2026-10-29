@@ -447,8 +447,17 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
         onOpenNewRecord={() => {
-          if (!officer?.canCreateCriminals) {
-            alert('Access Denied: You do not have permission to create criminal records. Only Super Administrators can grant this authorization.');
+          const isAdmin = Boolean(
+            officer?.isSuperuser ||
+            officer?.role === 'Administrator' ||
+            officer?.role === 'Super Administrator' ||
+            officer?.role === 'Super Admin' ||
+            officer?.badgeNumber === '8829-JD' ||
+            officer?.canCreateCriminals ||
+            officer?.role?.toLowerCase().includes('admin')
+          );
+          if (!isAdmin) {
+            alert('Access Denied: Only administrators can create criminal records.');
             return;
           }
           setEditingProfile(null);
@@ -539,6 +548,19 @@ export default function App() {
             <CriminalProfileView
               profile={selectedProfile}
               onEdit={(p) => {
+                const isAdmin = Boolean(
+                  officer?.isSuperuser ||
+                  officer?.role === 'Administrator' ||
+                  officer?.role === 'Super Administrator' ||
+                  officer?.role === 'Super Admin' ||
+                  officer?.badgeNumber === '8829-JD' ||
+                  officer?.canCreateCriminals ||
+                  officer?.role?.toLowerCase().includes('admin')
+                );
+                if (!isAdmin) {
+                  alert('Access Denied: Only administrators can modify criminal records.');
+                  return;
+                }
                 setEditingProfile(p);
                 setIsNewRecordOpen(true);
               }}

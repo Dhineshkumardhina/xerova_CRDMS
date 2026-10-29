@@ -39,7 +39,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const isSuperAdmin = Boolean(
     officer.isSuperuser ||
     officer.role === 'Super Administrator' ||
-    officer.role === 'Super Admin'
+    officer.role === 'Super Admin' ||
+    officer.role === 'Administrator' ||
+    officer.badgeNumber === '8829-JD'
   );
 
   const isRegionalAdmin = Boolean(
